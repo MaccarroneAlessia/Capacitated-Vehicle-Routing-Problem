@@ -157,7 +157,7 @@ Per evitare che restasse bloccato in soluzioni sub-ottime, sono stati aggiunti t
 st.header("Riepilogo statistico")
 df_global = load_global_summary()
 
-if df_global is not None:
+if df_global is not None and not df_global.empty:
     st.dataframe(
         df_global.style.highlight_min(subset=['BestCost', 'MeanCost', 'StdDevCost', 'MeanIterations'], color=HIGHLIGHT_COLOR),
         use_container_width=True
@@ -168,7 +168,7 @@ if df_global is not None:
         "conferma che il vincolo di capacità è sempre rispettato."
     )
 else:
-    st.warning("File global_summary.csv non trovato.")
+    st.warning("Riepilogo statistico globale vuoto o non trovato. Esegui l'algoritmo Java senza la modalità live per generarlo.")
 
 st.divider()
 

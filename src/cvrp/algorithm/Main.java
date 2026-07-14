@@ -76,10 +76,12 @@ public class Main {
 
         // Initialize global summary file
         String globalSummaryFileName = resultsDir + "/global_summary.csv";
-        try (FileWriter w = new FileWriter(globalSummaryFileName)) {
-            w.write("Instance,BestCost,MeanCost,StdDevCost,MeanIterations,Satisfability\n");
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (!liveMode) {
+            try (FileWriter w = new FileWriter(globalSummaryFileName)) {
+                w.write("Instance,BestCost,MeanCost,StdDevCost,MeanIterations,Satisfability\n");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         for (File instanceFile : instanceFiles) {
