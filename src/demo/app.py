@@ -8,6 +8,10 @@ import glob
 import subprocess
 import time
 
+# working directory  root del progetto, indipendentemente 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+os.chdir(PROJECT_ROOT)
+
 # Set page config
 st.set_page_config(page_title="CVRP Optimizer Dashboard", page_icon="🚚", layout="wide", initial_sidebar_state="auto")
 
