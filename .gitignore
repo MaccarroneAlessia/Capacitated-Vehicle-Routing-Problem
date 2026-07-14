@@ -1,0 +1,45 @@
+# Dati e Dataset
+data/*
+!data/.gitkeep
+
+# Materiale extra
+materiale/
+
+# File temporanei OS
+.DS_Store
+Thumbs.db
+
+# File di IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Output di compilazione o run
+results/*
+!results/.gitkeep
+out/
+build/
+bin/
+
+# Python / Ambienti Virtuali / Jupyter
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Configurazione Streamlit (se si usano secrets locali)
+.streamlit/secrets.toml
+
+# File Java
+*.class
+*.jar
+*.war
+
+# File di log
+*.log

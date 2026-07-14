@@ -1,0 +1,14 @@
+--- materiale/slide-AA2025-2026\20260304-presentation.pdf ---
+Keywords found: ['metaheuristic']
+--- materiale/slide-AA2025-2026\20260309-lesson.pdf ---
+Keywords found: ['tabu', 'simulated annealing', 'metaheuristic']
+--- materiale/slide-AA2025-2026\20260311-lesson.pdf ---
+Keywords found: ['cross', 'metaheuristic', 'crossover']
+--- materiale/slide-AA2025-2026\20260318-lesson.pdf ---
+Keywords found: ['metaheuristic']
+--- materiale/slide-AA2025-2026\20260323-lesson.pdf ---
+Keywords found: ['metaheuristic']
+--- materiale/slide-AA2025-2026\20260408-lesson.pdf ---
+Keywords found: ['metaheuristic']
+--- materiale/slide-AA2025-2026\20260413+20+22-lesson.pdf ---
+Keywords found: ['tabu', 'simulated annealing', '2-opt', '3-opt', 'swap', 'large neighborhood', 'nearest', 'metaheuristic', 'mutation']

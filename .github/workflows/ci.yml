@@ -1,0 +1,52 @@
+name: CI / CD per CVRP
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  test-java-python:
+    name: Build & Test (Java & Python)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # ==========================
+    # TEST JAVA
+    # ==========================
+    - name: Setup Java JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Build Java Code
+      run: |
+        mkdir -p bin
+        javac -d bin -sourcepath src src/cvrp/algorithm/Main.java
+        echo "✅ Compilazione Java completata con successo"
+
+    # ==========================
+    # TEST PYTHON
+    # ==========================
+    - name: Setup Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        cache: 'pip' # Aggiunge caching per installazioni più veloci
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    - name: Check Python Syntax (Flake8)
+      run: |
+        pip install flake8
+        # Interrompe la build se ci sono errori di sintassi o variabili non definite
+        flake8 src/demo/app.py --count --select=E9,F63,F7,F82 --show-source --statistics
+        echo "✅ Analisi sintattica Python completata"
