@@ -3,6 +3,14 @@ package cvrp.model;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Rappresentazione di una potenziale soluzione (Anticorpo) nell'Algoritmo Immunologico.
+ * 
+ * Ho strutturato l'anticorpo come una collezione di oggetti Route (i veicoli).
+ * Questa classe calcola e mantiene il costo totale (la distanza) e il grado di 
+ * "Affinità" (fitness), che nel CVRP è l'inverso del costo: vogliamo minimizzare la distanza.
+ */
+
 public class Antibody implements Comparable<Antibody> {
     public final List<Route> routes;
     private double fitness; // Total cost

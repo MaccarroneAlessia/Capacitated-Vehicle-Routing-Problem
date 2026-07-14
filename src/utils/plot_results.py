@@ -1,3 +1,6 @@
+"""
+Script di supporto per la generazione statica di grafici.
+"""
 import os
 import json
 import pandas as pd

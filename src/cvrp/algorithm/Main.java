@@ -12,6 +12,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Entry-point del programma Java. 
+ * 
+ * Gestisce il caricamento dei file `.vrp`, 
+ * l'esecuzione dei test statistici e l'esportazione dei risultati in formato 
+ * CSV e JSON.
+ */
+
 public class Main {
 
     public static void main(String[] args) {

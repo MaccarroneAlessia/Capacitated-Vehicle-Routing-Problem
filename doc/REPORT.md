@@ -47,7 +47,10 @@ L'operatore **2-Opt** viene utilizzato per "sbrogliare" gli incroci dei percorsi
 ## 4. Risultati e Visualizzazione
 L'algoritmo è stato testato formalmente sulle istanze della **CVRPLIB** dei set A, B, E e P raccomandati. Per analizzare i dati scientificamente è stata costruita una **Dashboard in Python (Streamlit)** ed esportato un Notebook Jupyter.
 
-I grafici ottenuti (consultabili eseguendo lo script della demo) mostrano:
+🌐 **Demo Live e CI/CD:** L'applicazione Streamlit è integrata con una pipeline di **Continuous Integration (CI)** tramite GitHub Actions, che valida il codice Java e Python ad ogni aggiornamento. Inoltre, la dashboard è accessibile pubblicamente online a questo indirizzo:
+🔗 **[App CVRP su Streamlit Cloud](https://capacitated-vehicle-routing-problem-jgnez4bsdkxthgvrgfs9mk.streamlit.app/)**
+
+I grafici ottenuti (consultabili eseguendo lo script della demo o tramite la web app) mostrano:
 1. **Convergenza Stabile:** Deviazione standard ridotta su 5 run indipendenti, prova della robustezza del framework.
 2. **Saturazione della Capacità (Satisfability):** I grafici a barre attestano che nessun veicolo supera mai il 100% del carico, ottenendo un *Satisfability Rate* del 100% in tutte le istanze analizzate.
 3. **Spazialità delle Rotte (Mappa 2D):** Le rotte ottimali disegnate confermano visivamente la totale assenza di incroci sovrapposti (i classici percorsi "a clessidra"), grazie all'azione chirurgica della 2-Opt con SA.

@@ -1,5 +1,12 @@
 package cvrp.model;
 
+/**
+ * Struttura dati per un singolo Nodo (Cliente o Deposito).
+ * 
+ * Memorizza le coordinate spaziali (x, y) e la propria domanda di merce.
+ * Include un metodo per calcolare la distanza euclidea verso un altro nodo.
+ */
+
 public class Node {
     public final int id;
     public final double x;

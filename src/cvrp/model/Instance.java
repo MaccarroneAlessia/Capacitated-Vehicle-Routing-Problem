@@ -6,6 +6,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Classe per il caricamento e la memorizzazione delle istanze CVRPLIB.
+ * 
+ * Legge i file `.vrp` e memorizza il numero di nodi, la capacità del veicolo,
+ * la lista dei clienti e il deposito.
+ * Pre-calcola la matrice delle distanze per ottimizzare i tempi di calcolo 
+ * della fitness durante l'esecuzione dell'algoritmo.
+ */
+
 public class Instance {
     public final String name;
     public final int dimension;

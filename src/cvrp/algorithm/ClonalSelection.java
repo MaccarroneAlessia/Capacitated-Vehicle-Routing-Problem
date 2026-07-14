@@ -10,6 +10,29 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * Implementazione dell'Algoritmo Memetico basato su Clonal Selection (Artificial Immune System) per il CVRP.
+ * 
+ * Ho implementato il motore di ottimizzazione principale, integrando la struttura
+ * base dell'algoritmo immunologico con alcune personalizzazioni per migliorarne la convergenza:
+ * 
+ * 1. Smart Initialization: Invece di partire da una popolazione totalmente casuale, ho scelto di 
+ *    inizializzare il 20% degli "anticorpi" usando un'euristica costruttiva greedy (Nearest Neighbor).
+ *    Questo accelera notevolmente il warm-up iniziale.
+ * 
+ * 2. Large Neighborhood Search (LNS): Per l'operatore di iper-mutazione, ho sviluppato una logica 
+ *    di Ruin & Recreate. Piuttosto che fare un semplice swap, distruggo blocchi di nodi sub-ottimi 
+ *    e li reinserisco nella posizione globalmente più economica, compiendo salti più ampi nello 
+ *    spazio di ricerca.
+ * 
+ * 3. Simulated Annealing (SA) in Local Search: Ho sostituito l'accettazione 
+ *    deterministica della 2-Opt (Hill Climbing) con un criterio stocastico basato sulla Temperatura. 
+ *    Accettando mosse peggiorative con una certa probabilità, l'algoritmo riesce a fuggire efficacemente
+ *    dai minimi locali, garantendo rotte pulite e prive di incroci.
+ * 
+ * L'algoritmo termina al raggiungimento del limite massimo di Fitness Evaluations (FE).
+ */
+
 public class ClonalSelection {
     private final Instance instance;
     private final int popSize;
@@ -50,8 +73,8 @@ public class ClonalSelection {
         List<Antibody> population = initializePopulation();
         
         if (tracker != null && !population.isEmpty()) {
-            // Mostriamo all'utente l'anticorpo "Random" (che si trova in fondo alla popolazione, prima del sort)
-            // come frame 0, per fargli vedere il disastro iniziale.
+            // Expose the unoptimized random solution (end of population before sort)
+            // to the tracker as the initial baseline frame.
             Antibody messyStart = population.get(population.size() - 1);
             tracker.onNewBest(0, messyStart.getFitness(), messyStart);
         }
@@ -86,8 +109,7 @@ public class ClonalSelection {
                     int numMutations = 1 + i; 
                     hyperMutate(clone, numMutations);
                     
-                    // MEMETIC STEP (Local Search with Simulated Annealing)
-                    // Applico SA Local Search solo ai cloni d'elite (i=0) per intensificare
+                    // MEMETIC STEP: Apply SA Local Search only to elite clones (i=0) for intensification
                     if (i == 0 && random.nextDouble() < 0.2) {
                         saLocalSearch(clone, currentEvaluations, maxEvaluations);
                     }
@@ -129,7 +151,7 @@ public class ClonalSelection {
 
     private List<Antibody> initializePopulation() {
         List<Antibody> pop = new ArrayList<>();
-        int smartCount = (int) (popSize * 0.20); // 20% smart initialized
+        int smartCount = (int) (popSize * 0.20); // 20% greedy initialization
         
         for (int i = 0; i < popSize; i++) {
             Antibody sol;
@@ -149,15 +171,14 @@ public class ClonalSelection {
         Antibody ab = new Antibody(instance);
         List<Node> unvisited = new ArrayList<>(instance.customers);
         
-        // Per introdurre varietà anche nell'euristica, mescoliamo leggermente
-        // o partiamo da un nodo randomico come primo cliente
+        // Shuffle unvisited nodes to introduce stochasticity into the greedy heuristic
         Collections.shuffle(unvisited, random);
 
         Route currentRoute = new Route(instance);
         Node currentNode = instance.depot;
 
         while (!unvisited.isEmpty()) {
-            // Trova il vicino più prossimo che rispetti la capacità
+            // Find the nearest feasible neighbor
             Node bestNext = null;
             double minDistance = Double.MAX_VALUE;
             
@@ -186,7 +207,7 @@ public class ClonalSelection {
                 unvisited.remove(bestNext);
                 currentNode = bestNext;
             } else {
-                // Veicolo pieno, chiudi la rotta e torniamo al deposito
+                // Vehicle capacity reached: close current route and return to depot
                 ab.routes.add(currentRoute);
                 currentRoute = new Route(instance);
                 currentNode = instance.depot;
@@ -301,7 +322,7 @@ public class ClonalSelection {
         Node n1 = r1.nodes.get(idx1);
         Node n2 = r2.nodes.get(idx2);
         
-        // Verifica se lo swap viola le capacità. (Togliamo il peso del vecchio, aggiungiamo il nuovo)
+        // Check capacity constraints before swapping nodes between routes
         int newLoad1 = r1.getLoad() - n1.demand + n2.demand;
         int newLoad2 = r2.getLoad() - n2.demand + n1.demand;
         
@@ -313,15 +334,15 @@ public class ClonalSelection {
         }
     }
 
-    // Memetic Alg: Local Search con Simulated Annealing Acceptance
+    // Memetic Algorithm: 2-Opt Local Search with Simulated Annealing Acceptance
     private void saLocalSearch(Antibody ab, int currentEval, int maxEval) {
-        // La temperatura decresce linearmente o esponenzialmente da T0 a 0
+        // Linearly decrease temperature based on evaluation progress
         double initialTemp = 100.0;
         double currentTemp = initialTemp * (1.0 - ((double) currentEval / maxEval));
         if (currentTemp < 0.1) currentTemp = 0.1;
 
         boolean improvement = true;
-        int maxIter = 50; // Limite iterazioni per evitare loop infiniti
+        int maxIter = 50; // Iteration limit to prevent infinite loops
         int iter = 0;
         
         while (improvement && iter < maxIter) {
@@ -342,10 +363,10 @@ public class ClonalSelection {
                         
                         boolean accept = false;
                         if (delta < -1e-4) {
-                            accept = true; // Miglioramento netto
+                            accept = true; // Strict improvement
                             improvement = true;
                         } else {
-                            // SA acceptance per peggioramenti
+                            // SA acceptance probability for worsening moves
                             double p = Math.exp(-delta / currentTemp);
                             if (random.nextDouble() < p) {
                                 accept = true;
@@ -373,9 +394,9 @@ public class ClonalSelection {
     private void largeNeighborhoodRuinRecreate(Antibody ab) {
         if (ab.routes.isEmpty()) return;
         
-        // RUIN: Scegliamo una rotta a caso e rimuoviamo una sequenza di N nodi
+        // RUIN phase: randomly select a route and remove a sequence of N nodes
         Route ruinedRoute = ab.routes.get(random.nextInt(ab.routes.size()));
-        if (ruinedRoute.nodes.size() < 3) return; // Troppo corta per LNS
+        if (ruinedRoute.nodes.size() < 3) return; // Route too short for LNS
         
         int ruinSize = 2 + random.nextInt(Math.min(4, ruinedRoute.nodes.size() - 1));
         int startIndex = random.nextInt(ruinedRoute.nodes.size() - ruinSize + 1);
@@ -385,7 +406,7 @@ public class ClonalSelection {
             removedNodes.add(ruinedRoute.removeNodeAt(startIndex));
         }
         
-        // RECREATE: Reinseriamo i nodi rimossi nella posizione migliore possibile (Greedy Insertion) in tutto l'anticorpo
+        // RECREATE phase: reinsert removed nodes using greedy global insertion
         for (Node n : removedNodes) {
             double bestIncrease = Double.MAX_VALUE;
             Route bestRoute = null;
@@ -410,7 +431,7 @@ public class ClonalSelection {
             if (bestRoute != null) {
                 bestRoute.addNodeAt(bestIndex, n);
             } else {
-                // Se nessun veicolo ha spazio, creiamo una nuova rotta
+                // Create a new route if no existing vehicle has sufficient capacity
                 Route newRoute = new Route(instance);
                 newRoute.addNode(n);
                 ab.routes.add(newRoute);

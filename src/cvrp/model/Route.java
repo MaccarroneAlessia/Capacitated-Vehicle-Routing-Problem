@@ -3,6 +3,14 @@ package cvrp.model;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Modello di un singolo percorso (Rotta) di un veicolo.
+ * 
+ * Ho progettato questa classe per tenere traccia della sequenza di clienti visitati 
+ * da un singolo mezzo. Incapsula la logica per calcolare il carico corrente (evitando
+ * di superare la capacità massima Q) e il costo della rotta (distanza percorsa).
+ */
+
 public class Route {
     public final List<Node> nodes; // exclude depot from start and end, just customers
     private int currentLoad;

@@ -59,9 +59,13 @@ java -cp bin cvrp.algorithm.Main
 ```
 
 ### 2. Dashboard Interattiva (Streamlit)
-Per esplorare visivamente i risultati, avviare l'App Streamlit:
+
+🌐 **Prova l'App Online!** La dashboard è supportata da una pipeline **CI/CD** (GitHub Actions) ed è ospitata gratuitamente qui:
+👉 **[Clicca per accedere alla Demo Live](https://capacitated-vehicle-routing-problem-jgnez4bsdkxthgvrgfs9mk.streamlit.app/)**
+
+In alternativa, per esplorare visivamente i risultati in locale, avviare l'App Streamlit:
 ```bash
-pip install streamlit pandas matplotlib
+pip install -r requirements.txt
 streamlit run src/demo/app.py
 ```
 

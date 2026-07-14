@@ -1,3 +1,6 @@
+"""
+Script di utilità per automatizzare il setup del progetto.
+"""
 import urllib.request
 import os
 
