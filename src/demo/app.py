@@ -39,11 +39,15 @@ HIGHLIGHT_COLOR = "#134e4a"
 INACTIVE_TEXT = "#888888"
 SUCCESS_COLOR = "#4ade80"
 WARNING_COLOR = "orange"
+YELLOW_WARNING = "#facc15"
+WHITE = "white"
+TRANSPARENT = "rgba(0,0,0,0)"
+RANK_GRADIENT = ["#2dd4bf", "#25a693", "#1c7871", "#144a4f", "#0b1c2c"]
 
 ROUTE_PALETTE = [
-    "#2dd4bf", "#60a5fa", "#f472b6", "#facc15", "#a78bfa",
-    "#4ade80", "#fb923c", "#38bdf8", "#e879f9", "#fbbf24",
-    "#94a3b8", "#f87171",
+    ACCENT, "#60a5fa", "#f472b6", YELLOW_WARNING, "#a78bfa",
+    SUCCESS_COLOR, "#fb923c", "#38bdf8", "#e879f9", "#fbbf24",
+    "#94a3b8", DEPOT_COLOR,
 ]
 
 def style_fig(fig, title=None, height=420):
@@ -52,10 +56,10 @@ def style_fig(fig, title=None, height=420):
         paper_bgcolor=BG,
         plot_bgcolor=BG,
         font=dict(color=TEXT, size=13),
-        title=dict(text=title, font=dict(size=17, color="white")) if title else None,
+        title=dict(text=title, font=dict(size=17, color=WHITE)) if title else None,
         margin=dict(l=40, r=20, t=50 if title else 20, b=40),
         height=height,
-        legend=dict(bgcolor="rgba(0,0,0,0)"),
+        legend=dict(bgcolor=TRANSPARENT),
         hoverlabel=dict(bgcolor=HOVER_BG, font_size=12),
     )
     fig.update_xaxes(gridcolor=GRID, zerolinecolor=GRID)
@@ -79,7 +83,7 @@ def route_map_figure(depot, routes, title, cost=None):
         ))
     fig.add_trace(go.Scatter(
         x=[depot[0]], y=[depot[1]], mode="markers", name="Deposito",
-        marker=dict(symbol="star", size=20, color=DEPOT_COLOR, line=dict(width=1, color="white")),
+        marker=dict(symbol="star", size=20, color=DEPOT_COLOR, line=dict(width=1, color=WHITE)),
         hovertemplate="Deposito<extra></extra>",
     ))
     full_title = title if cost is None else f"{title} — costo {cost:.2f}"
@@ -464,10 +468,13 @@ with tab3:
 
         elif step == 2:
             fitness = [10, 8, 5, 2, 1]
+            # Gradiente dal teal (rango 1, più affine) al grigio (rango 5, meno affine):
+            # il colore da solo comunica l'ordinamento, non solo l'altezza della barra.
             fig_edu.add_trace(go.Bar(x=[f"Sol {i+1}" for i in range(5)], y=fitness,
-                                      marker_color=[ROUTE_PALETTE[0]] * 5))
+                                      marker_color=RANK_GRADIENT,
+                                      text=[f"rango {i+1}" for i in range(5)], textposition="outside"))
             fig_edu.update_xaxes(visible=True)
-            fig_edu.update_yaxes(visible=True, title_text="Affinità")
+            fig_edu.update_yaxes(visible=True, title_text="Affinità (1 / costo)")
             fig_edu = style_fig(fig_edu, "Ordinamento per affinità (costo minore = migliore)", height=320)
 
         elif step == 3:
@@ -483,25 +490,50 @@ with tab3:
             fig_edu = style_fig(fig_edu, "Espansione clonale", height=320)
 
         elif step == 4:
-            fig_edu.add_trace(go.Scatter(x=[0.1, 0.3, 0.5, 0.7, 0.9], y=[0.5, 0.6, 0.5, 0.6, 0.5],
-                                          mode="lines", line=dict(color="white", width=1, dash="dot")))
-            fig_edu.add_trace(go.Scatter(x=[0.3, 0.5, 0.7], y=[0.6, 0.5, 0.6], mode="markers+lines",
+            # Rotta residua (i nodi non toccati dal ruin restano collegati)
+            fig_edu.add_trace(go.Scatter(x=[0.1, 0.9], y=[0.5, 0.5],
+                                          mode="lines+markers", name="Rotta residua",
+                                          line=dict(color=WHITE, width=1.5, dash="dot"),
+                                          marker=dict(size=10, color=WHITE)))
+            # Ruin: il segmento centrale viene tolto dalla rotta
+            fig_edu.add_trace(go.Scatter(x=[0.3, 0.5, 0.7], y=[0.6, 0.75, 0.6], mode="markers+lines",
                                           name="Ruin (rimossi)", marker=dict(size=12, color=DEPOT_COLOR),
-                                          line=dict(color=DEPOT_COLOR)))
-            fig_edu.add_trace(go.Scatter(x=[0.2, 0.5, 0.8], y=[0.2, 0.2, 0.2], mode="markers",
-                                          name="Recreate", marker=dict(size=12, color=SUCCESS_COLOR)))
+                                          line=dict(color=DEPOT_COLOR, dash="dash")))
+            # Recreate: gli stessi nodi vengono reinseriti nel punto di costo minimo
+            # della rotta residua (anche su un altro veicolo) — qui collegati, non isolati.
+            fig_edu.add_trace(go.Scatter(x=[0.1, 0.35, 0.9], y=[0.5, 0.25, 0.5], mode="markers+lines",
+                                          name="Recreate (reinseriti)", marker=dict(size=12, color=SUCCESS_COLOR),
+                                          line=dict(color=SUCCESS_COLOR, width=2)))
+            fig_edu.add_annotation(x=0.5, y=0.75, text="rimossi", showarrow=False, font=dict(color=DEPOT_COLOR, size=11))
+            fig_edu.add_annotation(x=0.35, y=0.2, text="reinseriti nel punto migliore", showarrow=False,
+                                    font=dict(color=SUCCESS_COLOR, size=11))
             fig_edu = style_fig(fig_edu, "Large Neighborhood Search: Ruin & Recreate", height=320)
 
         elif step == 5:
-            fig_edu.add_trace(go.Scatter(x=[0.1, 0.4], y=[0.1, 0.4], mode="lines",
-                                          line=dict(color=DEPOT_COLOR, width=2, dash="dash"), name="Incrocio"))
-            fig_edu.add_trace(go.Scatter(x=[0.1, 0.4], y=[0.4, 0.1], mode="lines",
+            # Pannello sinistro: la 2-Opt classica, un incrocio che diventa migliorativo
+            fig_edu.add_trace(go.Scatter(x=[0.02, 0.2], y=[0.75, 0.95], mode="lines",
+                                          line=dict(color=DEPOT_COLOR, width=2, dash="dash"), name="Incrocio (Δ<0, migliora)"))
+            fig_edu.add_trace(go.Scatter(x=[0.02, 0.2], y=[0.95, 0.75], mode="lines",
                                           line=dict(color=DEPOT_COLOR, width=2, dash="dash"), showlegend=False))
-            fig_edu.add_trace(go.Scatter(x=[0.6, 0.9], y=[0.1, 0.1], mode="lines",
-                                          line=dict(color=SUCCESS_COLOR, width=3), name="Sistemato"))
-            fig_edu.add_trace(go.Scatter(x=[0.6, 0.9], y=[0.4, 0.4], mode="lines",
+            fig_edu.add_trace(go.Scatter(x=[0.32, 0.5], y=[0.75, 0.75], mode="lines",
+                                          line=dict(color=SUCCESS_COLOR, width=3), name="Accettata sempre"))
+            fig_edu.add_trace(go.Scatter(x=[0.32, 0.5], y=[0.95, 0.95], mode="lines",
                                           line=dict(color=SUCCESS_COLOR, width=3), showlegend=False))
-            fig_edu = style_fig(fig_edu, "2-Opt + accettazione Simulated Annealing", height=320)
+            fig_edu.add_annotation(x=0.11, y=1.03, text="prima", showarrow=False, font=dict(size=10, color=WHITE))
+            fig_edu.add_annotation(x=0.41, y=1.03, text="dopo", showarrow=False, font=dict(size=10, color=WHITE))
+
+            # Pannello destro: il caso specifico del Simulated Annealing — mossa che
+            # PEGGIORA il costo ma viene accettata comunque con probabilità P = e^(-Δ/T)
+            fig_edu.add_trace(go.Scatter(x=[0.65, 0.95], y=[0.75, 0.95], mode="lines",
+                                          line=dict(color=YELLOW_WARNING, width=3, dash="dot"),
+                                          name="Mossa peggiorativa (Δ>0)"))
+            fig_edu.add_annotation(x=0.8, y=1.05, text="accettata con P = e^(−Δ/T)", showarrow=False,
+                                    font=dict(size=11, color=YELLOW_WARNING))
+            fig_edu.add_annotation(x=0.8, y=0.55, text="↳ evita di restare bloccati<br>in un minimo locale",
+                                    showarrow=False, font=dict(size=10, color=INACTIVE_TEXT))
+
+            fig_edu.update_yaxes(range=[0.4, 1.15])
+            fig_edu = style_fig(fig_edu, "2-Opt: correzione standard vs accettazione Simulated Annealing", height=320)
 
         elif step == 6:
             fig_edu.add_trace(go.Scatter(x=[0.2, 0.3, 0.25], y=[0.8, 0.8, 0.7], mode="markers",
@@ -512,7 +544,16 @@ with tab3:
 
         elif step == 7:
             fig_edu.add_annotation(x=0.5, y=0.5, text="RIPETI<br>IL CICLO", showarrow=False,
-                                    font=dict(size=26, color=ACCENT))
+                                    font=dict(size=22, color=ACCENT))
+            # Due frecce curve che formano un anello, per comunicare visivamente il loop
+            fig_edu.add_annotation(x=0.78, y=0.22, ax=0.22, ay=0.78, xref="x", yref="y", axref="x", ayref="y",
+                                    showarrow=True, arrowhead=3, arrowsize=1.2, arrowwidth=2.5, arrowcolor=ACCENT,
+                                    text="")
+            fig_edu.add_annotation(x=0.22, y=0.78, ax=0.78, ay=0.22, xref="x", yref="y", axref="x", ayref="y",
+                                    showarrow=True, arrowhead=3, arrowsize=1.2, arrowwidth=2.5, arrowcolor=ACCENT,
+                                    text="")
+            fig_edu.add_annotation(x=0.5, y=0.85, text="torna allo step 2 (Valutazione)", showarrow=False,
+                                    font=dict(size=11, color=INACTIVE_TEXT))
             fig_edu = style_fig(fig_edu, "Si torna alla fase di valutazione", height=320)
 
         st.plotly_chart(fig_edu, use_container_width=True)
