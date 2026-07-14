@@ -1,0 +1,5 @@
+Instance: E-n22-k4
+Best: 393.22062014159184
+Mean: 426.3240269952747
+StdDev: 26.138553539260236
+Satisfability: 21/21

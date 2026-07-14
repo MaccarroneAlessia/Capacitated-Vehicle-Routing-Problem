@@ -1,0 +1,5 @@
+Instance: A-n46-k7
+Best: 1072.0309206317795
+Mean: 1126.7617213399183
+StdDev: 38.926972428298214
+Satisfability: 45/45

@@ -1,0 +1,5 @@
+Instance: P-n70-k10
+Best: 943.4560901619535
+Mean: 1014.2550950477196
+StdDev: 65.61320719443715
+Satisfability: 69/69

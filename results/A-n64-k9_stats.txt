@@ -1,0 +1,5 @@
+Instance: A-n64-k9
+Best: 1605.923689633985
+Mean: 1775.5815889139485
+StdDev: 93.32301563363997
+Satisfability: 63/63

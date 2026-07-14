@@ -1,0 +1,5 @@
+Instance: A-n37-k5
+Best: 721.3575914932312
+Mean: 820.8376572284606
+StdDev: 93.53624688778923
+Satisfability: 36/36

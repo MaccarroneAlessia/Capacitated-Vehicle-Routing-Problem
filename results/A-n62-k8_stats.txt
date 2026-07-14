@@ -1,0 +1,5 @@
+Instance: A-n62-k8
+Best: 1571.698083975256
+Mean: 1596.444979299531
+StdDev: 23.41593967343283
+Satisfability: 61/61

@@ -1,0 +1,5 @@
+Instance: P-n65-k10
+Best: 856.0152392495131
+Mean: 972.0401358757312
+StdDev: 64.5226264417173
+Satisfability: 64/64

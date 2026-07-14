@@ -1,0 +1,5 @@
+Instance: P-n50-k8
+Best: 693.5496953063447
+Mean: 727.767302830199
+StdDev: 22.65149899761027
+Satisfability: 49/49

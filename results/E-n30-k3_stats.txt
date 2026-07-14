@@ -1,0 +1,5 @@
+Instance: E-n30-k3
+Best: 507.17020216088395
+Mean: 592.8522721554216
+StdDev: 72.64609893059728
+Satisfability: 29/29

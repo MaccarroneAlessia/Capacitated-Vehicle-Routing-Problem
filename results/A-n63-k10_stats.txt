@@ -1,0 +1,5 @@
+Instance: A-n63-k10
+Best: 1564.3334391232097
+Mean: 1655.6346813196892
+StdDev: 84.50130798920833
+Satisfability: 62/62

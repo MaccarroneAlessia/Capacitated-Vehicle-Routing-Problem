@@ -1,0 +1,5 @@
+Instance: B-n44-k7
+Best: 1008.6604340831452
+Mean: 1069.9214062598985
+StdDev: 39.50543364513287
+Satisfability: 43/43

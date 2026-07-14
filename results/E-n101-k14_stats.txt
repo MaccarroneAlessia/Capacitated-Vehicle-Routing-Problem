@@ -1,0 +1,6 @@
+Instance: E-n101-k14
+Best Cost: 1147.0814882480388
+Mean Cost: 1196.6568261464386
+StdDev Cost: 53.962630887616584
+Mean Iterations (Evaluations): 154237.6
+Satisfability: 100/100

@@ -1,0 +1,5 @@
+Instance: A-n39-k6
+Best: 905.8748888373675
+Mean: 1001.072300742681
+StdDev: 54.09707801673868
+Satisfability: 38/38

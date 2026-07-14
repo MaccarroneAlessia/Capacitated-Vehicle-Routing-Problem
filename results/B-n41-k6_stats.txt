@@ -1,0 +1,5 @@
+Instance: B-n41-k6
+Best: 931.7083862029615
+Mean: 1022.4693032941071
+StdDev: 51.133673916988876
+Satisfability: 40/40

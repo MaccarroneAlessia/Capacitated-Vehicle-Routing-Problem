@@ -16,7 +16,7 @@ Thumbs.db
 *.swo
 
 # Output di compilazione o run
-results/*
+# results/* rimossa per permettere di caricare i JSON e CSV su GitHub/Streamlit
 !results/.gitkeep
 out/
 build/

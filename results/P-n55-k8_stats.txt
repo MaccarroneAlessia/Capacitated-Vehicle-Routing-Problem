@@ -1,0 +1,5 @@
+Instance: P-n55-k8
+Best: 633.6961522458275
+Mean: 696.0341301676924
+StdDev: 41.152191008005005
+Satisfability: 54/54

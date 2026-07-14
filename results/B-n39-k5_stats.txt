@@ -1,0 +1,5 @@
+Instance: B-n39-k5
+Best: 606.0935579270282
+Mean: 667.3486223051973
+StdDev: 55.53686887819372
+Satisfability: 38/38

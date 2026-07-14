@@ -1,0 +1,5 @@
+Instance: P-n51-k10
+Best: 802.9766021530629
+Mean: 879.484076513032
+StdDev: 52.37545996934947
+Satisfability: 50/50
