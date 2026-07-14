@@ -95,7 +95,6 @@ def route_map_figure(depot, routes, title, cost=None):
 # ---------------------------------------------------------------------------
 # Caricamento dati
 # ---------------------------------------------------------------------------
-@st.cache_data
 def load_global_summary():
     summary_file = os.path.join(RESULTS_DIR, "global_summary.csv")
     if os.path.exists(summary_file):
