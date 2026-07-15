@@ -1,5 +1,0 @@
-Instance: P-n76-k4
-Best: 748.4753064141727
-Mean: 835.7000502681233
-StdDev: 50.464403971200205
-Satisfability: 75/75

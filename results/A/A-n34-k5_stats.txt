@@ -1,0 +1,6 @@
+Instance: A-n34-k5
+Best Cost: 787.430439254024
+Mean Cost: 795.7906911675133
+StdDev Cost: 15.362523075863809
+Mean Iterations (Evaluations): 136500.0
+Satisfability: 33/33

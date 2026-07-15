@@ -1,5 +1,0 @@
-Instance: A-n53-k7
-Best: 1119.360160938492
-Mean: 1268.0751480790157
-StdDev: 95.83420544847606
-Satisfability: 52/52

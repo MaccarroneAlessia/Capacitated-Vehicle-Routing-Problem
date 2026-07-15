@@ -1,0 +1,6 @@
+Instance: P-n22-k8
+Best Cost: 588.7935242586069
+Mean Cost: 593.6063292475824
+StdDev Cost: 6.590204643338202
+Mean Iterations (Evaluations): 44601.4
+Satisfability: 21/21

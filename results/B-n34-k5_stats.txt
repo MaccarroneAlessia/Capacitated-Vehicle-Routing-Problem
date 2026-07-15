@@ -1,5 +1,0 @@
-Instance: B-n34-k5
-Best: 823.5774909778405
-Mean: 899.6232261644321
-StdDev: 44.171583074856756
-Satisfability: 33/33

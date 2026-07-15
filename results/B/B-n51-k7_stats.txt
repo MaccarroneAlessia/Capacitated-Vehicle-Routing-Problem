@@ -1,0 +1,6 @@
+Instance: B-n51-k7
+Best Cost: 1149.2576864822454
+Mean Cost: 1185.9765418165236
+StdDev Cost: 35.228993829703754
+Mean Iterations (Evaluations): 31894.8
+Satisfability: 50/50

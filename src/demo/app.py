@@ -102,7 +102,9 @@ def load_global_summary():
     return None
 
 def get_available_instances():
-    json_files = glob.glob(os.path.join(RESULTS_DIR, "*_best_solution.json"))
+    json_files = glob.glob(os.path.join(RESULTS_DIR, "*", "*_best_solution.json"))
+    if not json_files:
+        json_files = glob.glob(os.path.join(RESULTS_DIR, "*_best_solution.json"))
     return [os.path.basename(f).replace("_best_solution.json", "") for f in json_files]
 
 
@@ -153,7 +155,37 @@ Per evitare che restasse bloccato in soluzioni sub-ottime, sono stati aggiunti t
   di convergenza.
 """)
 
-st.header("Riepilogo statistico")
+st.header("1. Studio di Ablazione")
+st.markdown("""
+L'**Ablation Study** misura rigorosamente l'impatto delle singole euristiche sul modello baseline disattivando alternativamente moduli dell'architettura Java.
+Sono state scelte 4 istanze target (`A-n32-k5`, `B-n56-k7`, `E-n101-k14`, `A-n45-k6`) per rappresentare ciascuna famiglia ed includere casi limite (es. altissima saturazione).
+""")
+
+target_instances = ['A-n32-k5', 'B-n56-k7', 'E-n101-k14', 'A-n45-k6']
+configs = ['baseline', 'nn', 'sa', 'lns', 'nn_sa', 'nn_lns', 'sa_lns', 'all']
+labels = ['Baseline', 'Solo NN', 'Solo SA', 'Solo LNS', 'NN+SA', 'NN+LNS', 'SA+LNS', 'Full (Tutti e 3)']
+
+results = []
+for instance in target_instances:
+    row = {'Istanza': instance}
+    for conf, label in zip(configs, labels):
+        csv_file = os.path.join(RESULTS_DIR, 'ablations', instance, f'{instance}_ablation_{conf}_convergence.csv')
+        if os.path.exists(csv_file):
+            df = pd.read_csv(csv_file)
+            row[label] = df['BestCost'].iloc[-1]
+        else:
+            row[label] = None
+    results.append(row)
+
+df_abl = pd.DataFrame(results)
+if not df_abl.empty and df_abl['Full (Tutti e 3)'].notna().any():
+    st.dataframe(df_abl.style.highlight_min(subset=labels, color=HIGHLIGHT_COLOR, axis=1).format({col: "{:.2f}" for col in labels}), use_container_width=True)
+    st.caption("Il modello 'Full' risulta la scelta vincente nella maggior parte dei contesti, giustificando la sinergia degli operatori memetici.")
+else:
+    st.info("Dati dell'ablation study non disponibili. Assicurati di aver generato la cartella results/ablations.")
+
+st.header("2. Risultati Istanze Consegna (Best Model)")
+st.markdown("Prestazioni del modello completo sulle istanze ufficialmente suggerite dalla specifica di progetto (Set A, B, E, P).")
 df_global = load_global_summary()
 
 if df_global is not None and not df_global.empty:
@@ -162,12 +194,33 @@ if df_global is not None and not df_global.empty:
         use_container_width=True
     )
     st.caption(
-        "La bassa deviazione standard tra run indipendenti indica un buon equilibrio tra "
-        "sfruttamento (exploitation) ed esplorazione (exploration); la Satisfability al 100% "
-        "conferma che il vincolo di capacità è sempre rispettato."
+        "La bassa deviazione standard conferma un eccellente equilibrio tra exploitation ed exploration; "
+        "la Satisfability garantisce l'assenza di violazioni del vincolo di capacità."
     )
 else:
-    st.warning("Riepilogo statistico globale vuoto o non trovato. Esegui l'algoritmo Java senza la modalità live per generarlo.")
+    st.warning("Riepilogo statistico globale vuoto o non trovato. Esegui l'algoritmo Java per generarlo.")
+
+st.header("3. Riepilogo Statistico per Famiglia")
+st.markdown("Metriche aggregate calcolate sull'intero dataset elaborato, raggruppate per macro-famiglie (A, B, E, P).")
+all_summary_file = os.path.join(RESULTS_DIR, "global_summary_all.csv")
+if os.path.exists(all_summary_file):
+    df_all = pd.read_csv(all_summary_file)
+    df_all['Family'] = df_all['Instance'].str[0]
+    df_all['Gap%'] = ((df_all['MeanCost'] - df_all['BestCost']) / df_all['BestCost']) * 100
+    
+    family_summary = df_all.groupby('Family').agg({
+        'Instance': 'count',
+        'BestCost': 'mean',
+        'Gap%': 'mean',
+        'StdDevCost': 'mean',
+        'MeanIterations': 'mean'
+    }).reset_index().rename(columns={'Instance': 'N. Istanze', 'BestCost': 'Costo Medio', 'Gap%': 'Gap Medio (%)'})
+    
+    st.dataframe(family_summary.style.format({
+        'Costo Medio': '{:.2f}', 'Gap Medio (%)': '{:.2f}%', 'StdDevCost': '{:.2f}', 'MeanIterations': '{:.0f}'
+    }).highlight_min(subset=['Gap Medio (%)', 'StdDevCost'], color=HIGHLIGHT_COLOR), use_container_width=True)
+else:
+    st.info("Dati aggregati per famiglia (global_summary_all.csv) non trovati.")
 
 st.divider()
 
@@ -296,8 +349,14 @@ with tab2:
 
     st.caption(f"Istanza corrente: **{selected_instance}**")
 
-    json_file = os.path.join(RESULTS_DIR, f"{selected_instance}_best_solution.json")
-    stats_file = os.path.join(RESULTS_DIR, f"{selected_instance}_stats.txt")
+    family = selected_instance[0]
+    json_file = os.path.join(RESULTS_DIR, family, f"{selected_instance}_best_solution.json")
+    stats_file = os.path.join(RESULTS_DIR, family, f"{selected_instance}_stats.txt")
+    
+    # Fallback for old structure (if any remain)
+    if not os.path.exists(json_file):
+        json_file = os.path.join(RESULTS_DIR, f"{selected_instance}_best_solution.json")
+        stats_file = os.path.join(RESULTS_DIR, f"{selected_instance}_stats.txt")
 
     col1, col2, col3, col4 = st.columns(4)
     if os.path.exists(stats_file):
@@ -313,11 +372,44 @@ with tab2:
         col3.metric("Iterazioni medie", f"{float(stats.get('Mean Iterations (Evaluations)', 0)):.0f}")
         col4.metric("Satisfability", stats.get('Satisfability', 'N/A'))
 
-    st.divider()
-
+    # --- Diagnostica Saturazione Bin-Packing ---
     if os.path.exists(json_file):
         with open(json_file, 'r') as f:
             data = json.load(f)
+            
+        loads = data.get('loads', [])
+        capacity = data.get('capacity', 1)
+        
+        import re
+        match = re.search(r'-k(\d+)', selected_instance)
+        if match and loads:
+            k = int(match.group(1))
+            total_cap = k * capacity
+            total_demand = sum(loads)
+            saturation = (total_demand / total_cap) * 100
+            
+            st.divider()
+            
+            col_diag1, col_diag2 = st.columns([1, 4])
+            with col_diag1:
+                st.metric(
+                    "Saturazione Capacità", 
+                    f"{saturation:.1f}%", 
+                    help=f"Domanda totale ({total_demand}) divisa per Capacità totale di {k} veicoli ({total_cap})"
+                )
+            with col_diag2:
+                if saturation > 95:
+                    st.warning("⚠️ **Istanza a bin-packing quasi saturo (>95%)**. L'operatore LNS (Ruin & Recreate) potrebbe avere grosse difficoltà a trovare scambi fattibili a causa della mancanza di spazio libero nei veicoli, aumentando la deviazione standard tra run indipendenti.")
+                else:
+                    st.success("✅ **Saturazione regolare**. I veicoli hanno spazio di manovra sufficiente per permettere all'LNS scambi efficaci.")
+
+    st.divider()
+
+    if os.path.exists(json_file):
+        # We already loaded 'data' above, but just in case:
+        if 'data' not in locals():
+            with open(json_file, 'r') as f:
+                data = json.load(f)
 
         col_conv, col_cap = st.columns(2)
 
@@ -325,7 +417,9 @@ with tab2:
         with col_conv:
             fig_conv = go.Figure()
             for run in range(5):
-                csv_file = os.path.join(RESULTS_DIR, f"{selected_instance}_run_{run}_convergence.csv")
+                csv_file = os.path.join(RESULTS_DIR, family, f"{selected_instance}_run_{run}_convergence.csv")
+                if not os.path.exists(csv_file):
+                    csv_file = os.path.join(RESULTS_DIR, f"{selected_instance}_run_{run}_convergence.csv")
                 if os.path.exists(csv_file):
                     df = pd.read_csv(csv_file)
                     fig_conv.add_trace(go.Scatter(

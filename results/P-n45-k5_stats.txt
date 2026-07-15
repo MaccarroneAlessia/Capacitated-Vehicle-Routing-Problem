@@ -1,5 +1,0 @@
-Instance: P-n45-k5
-Best: 553.4440888452558
-Mean: 602.4126270549059
-StdDev: 46.50877559805888
-Satisfability: 44/44

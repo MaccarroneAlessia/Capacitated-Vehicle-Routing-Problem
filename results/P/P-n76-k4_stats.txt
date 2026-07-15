@@ -1,0 +1,6 @@
+Instance: P-n76-k4
+Best Cost: 635.0416152341024
+Mean Cost: 663.7130531213352
+StdDev Cost: 20.72112169920801
+Mean Iterations (Evaluations): 171921.2
+Satisfability: 75/75

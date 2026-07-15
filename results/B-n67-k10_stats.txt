@@ -1,5 +1,0 @@
-Instance: B-n67-k10
-Best: 1207.5562456827965
-Mean: 1280.2708819196228
-StdDev: 94.33506319994625
-Satisfability: 66/66

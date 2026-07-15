@@ -1,5 +1,0 @@
-Instance: P-n16-k8
-Best: 451.9470921298185
-Mean: 457.4926743905406
-StdDev: 4.864712504832423
-Satisfability: 15/15

@@ -1,5 +1,0 @@
-Instance: E-n51-k5
-Best: 572.5220074324423
-Mean: 708.0341049871182
-StdDev: 110.36495775784293
-Satisfability: 50/50

@@ -1,0 +1,6 @@
+Instance: A-n60-k9
+Best Cost: 1392.1715094747742
+Mean Cost: 1442.4097649091655
+StdDev Cost: 49.22215870871854
+Mean Iterations (Evaluations): 222300.0
+Satisfability: 59/59

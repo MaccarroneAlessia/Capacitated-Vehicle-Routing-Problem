@@ -1,5 +1,0 @@
-Instance: P-n22-k8
-Best: 595.807498520667
-Mean: 610.8934744691229
-StdDev: 12.12102156847811
-Satisfability: 21/21

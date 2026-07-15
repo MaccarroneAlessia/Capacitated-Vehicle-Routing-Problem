@@ -1,0 +1,6 @@
+Instance: P-n19-k2
+Best Cost: 212.6569041858923
+Mean Cost: 215.91177838015818
+StdDev Cost: 4.517176873951565
+Mean Iterations (Evaluations): 11937.2
+Satisfability: 18/18

@@ -1,5 +1,0 @@
-Instance: E-n33-k4
-Best: 907.8719984709494
-Mean: 932.4808484263227
-StdDev: 18.027128924532853
-Satisfability: 32/32

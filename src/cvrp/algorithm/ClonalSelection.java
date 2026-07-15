@@ -13,43 +13,53 @@ import java.util.Random;
 /**
  * Implementazione dell'Algoritmo Memetico basato su Clonal Selection (Artificial Immune System) per il CVRP.
  * 
- * Ho implementato il motore di ottimizzazione principale, integrando la struttura
- * base dell'algoritmo immunologico con alcune personalizzazioni per migliorarne la convergenza:
+ * Motore di ottimizzazione principale che integra la selezione clonale con operatori euristici avanzati:
  * 
- * 1. Smart Initialization: Invece di partire da una popolazione totalmente casuale, ho scelto di 
- *    inizializzare il 20% degli "anticorpi" usando un'euristica costruttiva greedy (Nearest Neighbor).
- *    Questo accelera notevolmente il warm-up iniziale.
- * 
- * 2. Large Neighborhood Search (LNS): Per l'operatore di iper-mutazione, ho sviluppato una logica 
- *    di Ruin & Recreate. Piuttosto che fare un semplice swap, distruggo blocchi di nodi sub-ottimi 
- *    e li reinserisco nella posizione globalmente più economica, compiendo salti più ampi nello 
- *    spazio di ricerca.
- * 
- * 3. Simulated Annealing (SA) in Local Search: Ho sostituito l'accettazione 
- *    deterministica della 2-Opt (Hill Climbing) con un criterio stocastico basato sulla Temperatura. 
- *    Accettando mosse peggiorative con una certa probabilità, l'algoritmo riesce a fuggire efficacemente
- *    dai minimi locali, garantendo rotte pulite e prive di incroci.
- * 
- * L'algoritmo termina al raggiungimento del limite massimo di Fitness Evaluations (FE).
+ * 1. Smart Initialization: Inizializza una frazione della popolazione usando un'euristica costruttiva greedy (Nearest Neighbor), accelerando la convergenza iniziale.
+ * 2. Large Neighborhood Search (LNS): Un operatore di Ruin & Recreate distrugge porzioni di rotte sub-ottime e le reinserisce nella posizione globalmente più economica, evitando trappole di minimo locale.
+ * 3. Simulated Annealing (SA) in Local Search: Sostituisce l'accettazione deterministica della 2-Opt con un criterio stocastico basato sulla Temperatura, permettendo all'algoritmo di fuggire efficacemente dai minimi locali.
+ * 4. Saturated Mode (Receptor Editing): Meccanismo adattivo fuzzy che modula il tasso di rimpiazzo della popolazione e l'intensità delle mutazioni in base al livello di saturazione della flotta (domanda vs capacità).
  */
-
 public class ClonalSelection {
+    // Geometrical and logic properties of the problem instance
     private final Instance instance;
+    
+    // Core parameters of the Clonal Selection Algorithm
     private final int popSize;
     private final int selectionSize;
     private final double cloneFactor;
     private final Random random;
     private final int maxEvaluations;
 
+    // Tracking variables for progress and optimal solution
     private int currentEvaluations;
     private Antibody bestAntibody;
     private int bestEvaluations;
+    
+    // Algorithmic estimation for total necessary vehicles
+    private int estimatedK = -1;
+
+    // ABLATION FLAGS (for experimental toggle of algorithmic features)
+    private boolean useNN = true;
+    private boolean useSA = true;
+    private boolean useLNS = true;
+    private boolean useAdaptiveMode = true;
+
+    public void setAblations(boolean useNN, boolean useSA, boolean useLNS) {
+        this.useNN = useNN;
+        this.useSA = useSA;
+        this.useLNS = useLNS;
+    }
+
+    public void setAdaptiveMode(boolean useAdaptiveMode) {
+        this.useAdaptiveMode = useAdaptiveMode;
+    }
 
     public int getBestEvaluations() {
         return bestEvaluations;
     }
 
-    // Callbacks for tracking
+    // Callbacks for tracking algorithm convergence and telemetry
     public interface Tracker {
         void onNewBest(int evaluations, double cost, Antibody bestAntibody);
     }
@@ -68,21 +78,39 @@ public class ClonalSelection {
         this.tracker = tracker;
     }
 
+    /**
+     * Esegue il ciclo principale dell'algoritmo genetico-immunitario.
+     * Itera le fasi di clonazione, mutazione, selezione e editing dei recettori 
+     * fino all'esaurimento del budget computazionale (Fitness Evaluations).
+     */
     public Antibody run() {
         currentEvaluations = 0;
+        
+        // Fallback se l'inizializzazione Greedy (NN) è disattivata dall'ablation
+        // Fallback constraint logic to establish minimum fleet size if Greedy heuristic is bypassed
+        if (!useNN || estimatedK == -1) {
+            double totalDemand = instance.customers.stream().mapToDouble(n -> n.demand).sum();
+            // Calcolo teorico del numero minimo di veicoli (Bin Packing Lower Bound)
+            // Theoretical lower bound of required vehicles based on aggregate demand vs capacity
+            estimatedK = (int) Math.ceil(totalDemand / instance.capacity);
+            if (estimatedK < 1) estimatedK = 1;
+        }
+
         List<Antibody> population = initializePopulation();
         
         if (tracker != null && !population.isEmpty()) {
             // Expose the unoptimized random solution (end of population before sort)
-            // to the tracker as the initial baseline frame.
+            // to the tracker as the initial baseline frame for live visualization.
             Antibody messyStart = population.get(population.size() - 1);
             tracker.onNewBest(0, messyStart.getFitness(), messyStart);
         }
         
+        // Main Evolutionary Loop bounded by Fitness Evaluation budget
         while (currentEvaluations < maxEvaluations) {
-            // Sort population by fitness
+            // Sort population by fitness (lower cost is prioritized)
             Collections.sort(population);
 
+            // Update global best if a new optimum is found
             if (bestAntibody == null || population.get(0).getFitness() < bestAntibody.getFitness()) {
                 bestAntibody = new Antibody(population.get(0));
                 bestEvaluations = currentEvaluations;
@@ -91,26 +119,30 @@ public class ClonalSelection {
                 }
             }
 
-            // Select best 'selectionSize' antibodies
+            // Select best 'selectionSize' antibodies for cloning
             List<Antibody> selected = new ArrayList<>(population.subList(0, selectionSize));
 
-            // Clone and mutate
+            // Proliferation stage: Clone and mutate
             List<Antibody> clones = new ArrayList<>();
             for (int i = 0; i < selected.size(); i++) {
                 Antibody parent = selected.get(i);
-                int numClones = (int) Math.round(cloneFactor * popSize / (i + 1.0)); // Better ones get more clones
+                
+                // Affinity Proportionate Cloning: Better ranked antibodies (lower 'i') produce more clones
+                int numClones = (int) Math.round(cloneFactor * popSize / (i + 1.0));
                 if (numClones < 1) numClones = 1;
 
                 for (int c = 0; c < numClones; c++) {
+                    // Preemptive execution guard
                     if (currentEvaluations >= maxEvaluations) break;
+                    
                     Antibody clone = new Antibody(parent);
                     
-                    // Mutation rate inversely proportional to rank
+                    // Hypermutation phase: Mutation rate is inversely proportional to rank (worse clones mutate more)
                     int numMutations = 1 + i; 
                     hyperMutate(clone, numMutations);
                     
-                    // MEMETIC STEP: Apply SA Local Search only to elite clones (i=0) for intensification
-                    if (i == 0 && random.nextDouble() < 0.2) {
+                    // MEMETIC STEP: Apply SA Local Search only to elite clones (i=0) for intense local exploitation
+                    if (useSA && i == 0 && random.nextDouble() < 0.2) {
                         saLocalSearch(clone, currentEvaluations, maxEvaluations);
                     }
 
@@ -125,10 +157,23 @@ public class ClonalSelection {
             Collections.sort(population);
             population = new ArrayList<>(population.subList(0, popSize)); // Keep top popSize
 
-            // Receptor Editing (replace worst 10% with random new solutions)
-            int replaceCount = (int) (0.1 * popSize);
+            // Receptor Editing: transizione morbida dal 10% (sat <= 80%) al 20% (sat >= 95%)
+            // Fuzzy Adaptive Receptor Editing to inject diversity based on instance difficulty (saturation)
+            double sat = instance.getSaturation(estimatedK);
+            double alpha = 0.0;
+            if (useAdaptiveMode) {
+                // Linear fuzzy membership function [0.0, 1.0] over [80%, 95%] saturation range
+                alpha = Math.max(0.0, Math.min(1.0, (sat - 0.8) / 0.15));
+            }
+            double editingRate = 0.1 + alpha * 0.1;
+            int replaceCount = (int) (editingRate * popSize);
+            
             for (int i = 0; i < replaceCount; i++) {
-                if (currentEvaluations >= maxEvaluations) break;
+                // Guardia preventiva: se abbiamo esaurito le valutazioni, fermiamo immediatamente l'editing
+                // Hard guard against surpassing the evaluation budget during diversity injection
+                if (currentEvaluations >= maxEvaluations) {
+                    break;
+                }
                 Antibody fresh = generateRandomSolution();
                 fresh.recalculateFitness();
                 currentEvaluations++;
@@ -136,7 +181,7 @@ public class ClonalSelection {
             }
         }
         
-        // Final check
+        // Final check and sort post-evaluation loop
         Collections.sort(population);
         if (population.get(0).getFitness() < bestAntibody.getFitness()) {
             bestAntibody = new Antibody(population.get(0));
@@ -149,16 +194,24 @@ public class ClonalSelection {
         return bestAntibody;
     }
 
+    /**
+     * Inizializza la popolazione miscelando algoritmi costruttivi deterministici (Greedy/NN)
+     * e puramente casuali per massimizzare la copertura spaziale garantendo al contempo convergenza veloce.
+     */
     private List<Antibody> initializePopulation() {
         List<Antibody> pop = new ArrayList<>();
-        int smartCount = (int) (popSize * 0.20); // 20% greedy initialization
+        // Inject up to 20% heuristically sound solutions to accelerate convergence
+        int smartCount = useNN ? (int) (popSize * 0.20) : 0; 
         
         for (int i = 0; i < popSize; i++) {
             Antibody sol;
             if (i < smartCount) {
                 sol = generateSmartSolution(); // Nearest-Neighbor (Greedy)
+                if (estimatedK == -1 && !sol.routes.isEmpty()) {
+                    estimatedK = sol.routes.size(); // Set estimated K heuristically
+                }
             } else {
-                sol = generateRandomSolution(); // Random
+                sol = generateRandomSolution(); // Purely random construction
             }
             sol.recalculateFitness();
             currentEvaluations++;
@@ -167,6 +220,10 @@ public class ClonalSelection {
         return pop;
     }
 
+    /**
+     * Genera una soluzione costruttiva tramite l'euristica Nearest-Neighbor (Greedy)
+     * stocasticizzata per creare varietà all'interno del sub-pool di élite.
+     */
     private Antibody generateSmartSolution() {
         Antibody ab = new Antibody(instance);
         List<Node> unvisited = new ArrayList<>(instance.customers);
@@ -182,7 +239,7 @@ public class ClonalSelection {
             Node bestNext = null;
             double minDistance = Double.MAX_VALUE;
             
-            // Introduce a small randomness factor (e.g. 10% chance to pick random feasible)
+            // Introduce a small randomness factor (e.g. 10% chance to pick random feasible node instead of nearest)
             if (random.nextDouble() < 0.1) {
                 for (Node n : unvisited) {
                     if (currentRoute.canAdd(n)) {
@@ -219,6 +276,9 @@ public class ClonalSelection {
         return ab;
     }
 
+    /**
+     * Genera un anticorpo completamente stocastico (random) rispettando il vincolo di capacità.
+     */
     private Antibody generateRandomSolution() {
         Antibody ab = new Antibody(instance);
         List<Node> unvisited = new ArrayList<>(instance.customers);
@@ -240,18 +300,54 @@ public class ClonalSelection {
         return ab;
     }
 
+    /**
+     * Modula l'intensità delle mutazioni (Intra-Route, Inter-Route, LNS)
+     * e le applica in maniera stocastica bilanciata dall'Alpha parametro della Saturated Mode.
+     */
     private void hyperMutate(Antibody ab, int numMutations) {
+        // Transizione lineare delle probabilità di mutazione tra baseline e saturated
+        double sat = instance.getSaturation(estimatedK);
+        double alpha = 0.0;
+        if (useAdaptiveMode) {
+            alpha = Math.max(0.0, Math.min(1.0, (sat - 0.8) / 0.15));
+        }
+        
+        // Probability distribution of specific permutation operators modulated by fuzzy logic
+        double p0 = 0.2 + alpha * 0.1; // intraSwap: 20% -> 30%
+        double p1 = 0.2 + alpha * 0.1; // intra2Opt: 20% -> 30%
+        double p2 = 0.2 - alpha * 0.2; // interRelocate: 20% -> 0%
+        double p3 = 0.2 + alpha * 0.1; // interSwapNodes: 20% -> 30%
+        // p4 (LNS) is implicitly the remaining probability: 20% -> 10%
+
+        if (!useLNS) {
+            // Normalize probabilities if LNS is completely deactivated for ablation study
+            double scale = 1.0 / (p0 + p1 + p2 + p3);
+            p0 *= scale;
+            p1 *= scale;
+            p2 *= scale;
+            p3 *= scale;
+        }
+        
         for (int m = 0; m < numMutations; m++) {
-            int op = random.nextInt(5);
+            int op = -1;
+            double r = random.nextDouble();
+            
+            // Roulette wheel selection for the specific mutation operator
+            if (r < p0) op = 0;
+            else if (r < p0 + p1) op = 1;
+            else if (r < p0 + p1 + p2) op = 2;
+            else if (r < p0 + p1 + p2 + p3) op = 3;
+            else op = useLNS ? 4 : random.nextInt(4);
+            
             switch (op) {
                 case 0: intraRouteSwap(ab); break;
                 case 1: intraRoute2Opt(ab); break;
                 case 2: interRouteRelocate(ab); break;
                 case 3: interRouteSwapNodes(ab); break;
-                case 4: largeNeighborhoodRuinRecreate(ab); break;
+                case 4: if(useLNS) largeNeighborhoodRuinRecreate(ab); break;
             }
         }
-        // Cleanup empty routes
+        // Cleanup empty routes that might have been drained by relocations
         ab.routes.removeIf(Route::isEmpty);
     }
 
@@ -275,7 +371,7 @@ public class ClonalSelection {
         int i = random.nextInt(r.nodes.size() - 2);
         int j = i + 2 + random.nextInt(r.nodes.size() - i - 2);
         
-        // Reverse sublist from i to j
+        // Reverse sublist from i to j (destroys crossing edges in a planar graph)
         int left = i, right = j;
         while (left < right) {
             Node temp = r.nodes.get(left);
@@ -299,6 +395,7 @@ public class ClonalSelection {
         int nodeIdx = random.nextInt(r1.nodes.size());
         Node n = r1.nodes.get(nodeIdx);
         
+        // Try inserting the node from route 1 into route 2 respecting capacity constraint
         if (r2.canAdd(n)) {
             r1.removeNodeAt(nodeIdx);
             int insertIdx = r2.nodes.isEmpty() ? 0 : random.nextInt(r2.nodes.size() + 1);
@@ -334,15 +431,19 @@ public class ClonalSelection {
         }
     }
 
-    // Memetic Algorithm: 2-Opt Local Search with Simulated Annealing Acceptance
+    /**
+     * Memetic Algorithm Component: 2-Opt Local Search con accettazione Simulated Annealing (SA).
+     * Invece di accettare rigorosamente solo le mosse migliorative (Hill Climbing), il 
+     * Simulated Annealing accetta occasionalmente peggioramenti per fuggire dai minimi locali.
+     */
     private void saLocalSearch(Antibody ab, int currentEval, int maxEval) {
-        // Linearly decrease temperature based on evaluation progress
+        // Linearly decrease temperature based on evaluation progress (exploration to exploitation)
         double initialTemp = 100.0;
         double currentTemp = initialTemp * (1.0 - ((double) currentEval / maxEval));
-        if (currentTemp < 0.1) currentTemp = 0.1;
+        if (currentTemp < 0.1) currentTemp = 0.1; // Freeze boundary
 
         boolean improvement = true;
-        int maxIter = 50; // Iteration limit to prevent infinite loops
+        int maxIter = 50; // Iteration limit to prevent infinite loops on flat plateaus
         int iter = 0;
         
         while (improvement && iter < maxIter) {
@@ -357,22 +458,25 @@ public class ClonalSelection {
                         Node c = r.nodes.get(j);
                         Node d = (j == r.nodes.size() - 1) ? instance.depot : r.nodes.get(j + 1);
                         
+                        // Delta calculation: Geometric cost of new connections minus old connections
                         double currentDist = a.distanceTo(b) + c.distanceTo(d);
                         double newDist = a.distanceTo(c) + b.distanceTo(d);
                         double delta = newDist - currentDist;
                         
                         boolean accept = false;
                         if (delta < -1e-4) {
-                            accept = true; // Strict improvement
+                            // Strict improvement: ALWAYS accept
+                            accept = true; 
                             improvement = true;
                         } else {
-                            // SA acceptance probability for worsening moves
+                            // SA stochastic acceptance probability for worsening moves
                             double p = Math.exp(-delta / currentTemp);
                             if (random.nextDouble() < p) {
                                 accept = true;
                             }
                         }
                         
+                        // Execute the topological 2-Opt swap in the data structure
                         if (accept) {
                             int left = i, right = j;
                             while (left < right) {
@@ -390,13 +494,17 @@ public class ClonalSelection {
         }
     }
 
-    // Large Neighborhood Search (LNS) - Ruin & Recreate Mutation
+    /**
+     * Large Neighborhood Search (LNS) - Ruin & Recreate Operator.
+     * Operatore distruttivo e costruttivo. A differenza delle piccole mutazioni (swap, relocate),
+     * LNS estirpa catene contigue e le ricuce globalmente nel miglior veicolo disponibile.
+     */
     private void largeNeighborhoodRuinRecreate(Antibody ab) {
         if (ab.routes.isEmpty()) return;
         
-        // RUIN phase: randomly select a route and remove a sequence of N nodes
+        // RUIN phase: randomly select a route and completely extract a sequence of N contiguous nodes
         Route ruinedRoute = ab.routes.get(random.nextInt(ab.routes.size()));
-        if (ruinedRoute.nodes.size() < 3) return; // Route too short for LNS
+        if (ruinedRoute.nodes.size() < 3) return; // Route too short for meaningful LNS
         
         int ruinSize = 2 + random.nextInt(Math.min(4, ruinedRoute.nodes.size() - 1));
         int startIndex = random.nextInt(ruinedRoute.nodes.size() - ruinSize + 1);
@@ -406,7 +514,8 @@ public class ClonalSelection {
             removedNodes.add(ruinedRoute.removeNodeAt(startIndex));
         }
         
-        // RECREATE phase: reinsert removed nodes using greedy global insertion
+        // RECREATE phase: sequentially reinsert removed nodes using greedy global insertion 
+        // into any vehicle across the entire fleet prioritizing the minimum geometric delta
         for (Node n : removedNodes) {
             double bestIncrease = Double.MAX_VALUE;
             Route bestRoute = null;
@@ -431,7 +540,7 @@ public class ClonalSelection {
             if (bestRoute != null) {
                 bestRoute.addNodeAt(bestIndex, n);
             } else {
-                // Create a new route if no existing vehicle has sufficient capacity
+                // Failsafe: Create a brand new route if no existing vehicle has sufficient capacity
                 Route newRoute = new Route(instance);
                 newRoute.addNode(n);
                 ab.routes.add(newRoute);

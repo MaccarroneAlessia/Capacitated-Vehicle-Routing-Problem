@@ -1,5 +1,0 @@
-Instance: B-n50-k7
-Best: 885.884725415151
-Mean: 926.6714747159934
-StdDev: 35.46974833225982
-Satisfability: 49/49

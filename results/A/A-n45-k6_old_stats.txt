@@ -1,0 +1,6 @@
+Instance: A-n45-k6
+Best Cost: 966.7150558159587
+Mean Cost: 1108.7724814539447
+StdDev Cost: 72.9622534869181
+Mean Iterations (Evaluations): 121328.8
+Satisfability: 44/44

@@ -1,5 +1,0 @@
-Instance: A-n33-k6
-Best: 808.5511251765547
-Mean: 835.100084668458
-StdDev: 25.533353738889875
-Satisfability: 32/32

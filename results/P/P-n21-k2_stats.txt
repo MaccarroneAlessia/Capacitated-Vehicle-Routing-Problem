@@ -1,0 +1,6 @@
+Instance: P-n21-k2
+Best Cost: 212.71153970290385
+Mean Cost: 212.71153970290385
+StdDev Cost: 0.0
+Mean Iterations (Evaluations): 2380.0
+Satisfability: 20/20

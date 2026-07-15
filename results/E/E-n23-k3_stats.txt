@@ -1,0 +1,6 @@
+Instance: E-n23-k3
+Best Cost: 568.5625010705219
+Mean Cost: 568.5625010705219
+StdDev Cost: 0.0
+Mean Iterations (Evaluations): 2980.0
+Satisfability: 22/22

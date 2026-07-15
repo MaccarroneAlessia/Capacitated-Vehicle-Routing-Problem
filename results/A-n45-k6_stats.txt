@@ -1,5 +1,0 @@
-Instance: A-n45-k6
-Best: 1065.593873061794
-Mean: 1158.1017979722965
-StdDev: 64.85202267013128
-Satisfability: 44/44

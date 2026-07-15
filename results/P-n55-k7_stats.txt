@@ -1,5 +1,0 @@
-Instance: P-n55-k7
-Best: 641.7720874863863
-Mean: 715.7831736907842
-StdDev: 55.62351074373383
-Satisfability: 54/54

@@ -1,5 +1,0 @@
-Instance: E-n23-k3
-Best: 569.7461012117925
-Mean: 596.4687660177417
-StdDev: 27.064802587645207
-Satisfability: 22/22

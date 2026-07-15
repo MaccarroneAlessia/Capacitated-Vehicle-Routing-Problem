@@ -1,5 +1,0 @@
-Instance: E-n76-k10
-Best: 968.6750143208588
-Mean: 1003.7575291915488
-StdDev: 18.723472565003835
-Satisfability: 75/75

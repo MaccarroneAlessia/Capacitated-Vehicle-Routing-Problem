@@ -1,5 +1,0 @@
-Instance: P-n19-k2
-Best: 247.77121070168448
-Mean: 258.1083129661021
-StdDev: 9.845741914171697
-Satisfability: 18/18

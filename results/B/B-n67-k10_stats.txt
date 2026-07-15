@@ -1,0 +1,6 @@
+Instance: B-n67-k10
+Best Cost: 1082.1402208707436
+Mean Cost: 1105.4563225660102
+StdDev Cost: 18.623164019246953
+Mean Iterations (Evaluations): 62068.6
+Satisfability: 66/66

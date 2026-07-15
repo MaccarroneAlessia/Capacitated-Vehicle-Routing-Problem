@@ -1,0 +1,6 @@
+Instance: B-n41-k6
+Best Cost: 911.105071390567
+Mean Cost: 930.7135118219519
+StdDev Cost: 15.3988820398341
+Mean Iterations (Evaluations): 154950.4
+Satisfability: 40/40

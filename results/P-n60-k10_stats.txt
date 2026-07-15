@@ -1,5 +1,0 @@
-Instance: P-n60-k10
-Best: 887.3570197002521
-Mean: 932.9983270865532
-StdDev: 43.70165872844789
-Satisfability: 59/59

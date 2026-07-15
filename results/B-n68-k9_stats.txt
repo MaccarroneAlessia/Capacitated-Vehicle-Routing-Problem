@@ -1,5 +1,0 @@
-Instance: B-n68-k9
-Best: 1510.059243299481
-Mean: 1574.7254893102665
-StdDev: 53.39110657788957
-Satisfability: 67/67

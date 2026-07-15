@@ -7,8 +7,18 @@ Questo progetto implementa un **Algoritmo Memetico Avanzato** basato sul paradig
 - **Clonal Selection Algorithm (CSA):** Un algoritmo meta-euristico bio-ispirato.
 - **Smart Initialization:** Il 20% della popolazione iniziale è generata usando l'euristica *Nearest Neighbor*, garantendo una convergenza molto più rapida rispetto a un'inizializzazione puramente casuale.
 - **Large Neighborhood Search (LNS):** Un operatore di iper-mutazione (Ruin & Recreate) studiato per distruggere blocchi di percorsi sub-ottimi e reinserirli globalmente.
-- **Simulated Annealing (SA) in Local Search:** La 2-Opt locale accetta mosse peggiorative con una probabilità basata sulla Temperatura per fuggire efficacemente dai minimi locali.
+- **Simulated Annealing (SA) in Local Search:** La 2-Opt locale accetta mosse peggiorative con una probabilità basata sulla Temperatura per fuggire efficacemente dai minimi locali (raffreddamento lineare basato sul budget).
+- **Ablation Study Framework:** Il codice isola gli operatori per dimostrare scientificamente il loro impatto sulla convergenza.
+- **Robustezza Industriale:** Algoritmo adattivo in base alla saturazione geometrica dell'istanza (Fuzzy Transition) e implementazione transazionale e deterministica degli operatori di Local Search per evitare la corruzione delle soluzioni.
 - **Dashboard Streamlit Interattiva:** Un simulatore visivo e analitico per esplorare le metriche di convergenza, il riempimento dei veicoli e la forma spaziale delle rotte.
+
+## ✨ Miglioramenti Ingegneristici & Rigore Scientifico
+Il codice sorgente Java è stato ottimizzato secondo rigorosi standard di ingegneria del software e metodologia statistica:
+- **Correzione di Bessel ($N-1$):** Calcolo della deviazione standard campionaria per una corretta analisi della varianza statistica su esecuzioni stocastiche.
+- **Saturated Mode (Fuzzy Transition):** Il tasso di mutazione e di recettore editing varia dinamicamente in modo *fuzzy* in base al rapporto di saturazione della flotta (domanda vs capacità).
+- **Robustezza di Parsing:** Implementato un parser basato su Espressioni Regolari (Regex) per tollerare formattazioni storiche inconsistenti dei dataset TSPLIB/CVRPLIB.
+- **Ottimizzazioni O(1) e CPU:** Sostituzione di colli di bottiglia (`Math.pow`) con moltiplicazioni algebriche dirette e uso di deep-copy pre-allocate per alleggerire il Garbage Collector.
+- **Incapsulamento Difensivo:** Le strutture dati spaziali (`Node`, `Route`, `Antibody`) garantiscono thread-safety e coerenza di stato deterministica durante i cicli di mutazione clonale.
 
 ## 📂 Struttura del Progetto
 Di seguito l'architettura delle cartelle e dei file principali, con la spiegazione del loro ruolo nel flusso di lavoro:

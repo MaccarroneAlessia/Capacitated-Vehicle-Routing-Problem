@@ -1,5 +1,0 @@
-Instance: P-n21-k2
-Best: 214.79404150505496
-Mean: 231.5384306681238
-StdDev: 10.845296539031022
-Satisfability: 20/20

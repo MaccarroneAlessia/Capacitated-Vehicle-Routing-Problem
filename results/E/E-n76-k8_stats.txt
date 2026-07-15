@@ -1,0 +1,6 @@
+Instance: E-n76-k8
+Best Cost: 786.8758737533067
+Mean Cost: 853.6519997816631
+StdDev Cost: 40.27862547971221
+Mean Iterations (Evaluations): 89303.8
+Satisfability: 75/75

@@ -1,5 +1,0 @@
-Instance: A-n61-k9
-Best: 1181.296744118141
-Mean: 1288.5910309034068
-StdDev: 89.87915849925763
-Satisfability: 60/60

@@ -1,5 +1,0 @@
-Instance: P-n50-k7
-Best: 638.02643691979
-Mean: 683.8991028673213
-StdDev: 29.745776415612347
-Satisfability: 49/49
