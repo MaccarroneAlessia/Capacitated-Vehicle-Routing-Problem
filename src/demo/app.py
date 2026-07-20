@@ -398,7 +398,7 @@ with tab_abl:
         if os.path.exists(csv):
             fa = True
             dc = pd.read_csv(csv)
-            fc.add_trace(go.Scatter(x=dc['Generations'], y=dc['BestCost'], mode='lines', name=l))
+            fc.add_trace(go.Scatter(x=dc['Evaluations'], y=dc['BestCost'], mode='lines', name=l))
     if fa:
         fc.update_layout(title=f"Convergenza Ablation: {sa}", height=500)
         st.plotly_chart(fc, use_container_width=True)

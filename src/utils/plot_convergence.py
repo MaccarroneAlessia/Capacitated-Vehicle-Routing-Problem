@@ -7,6 +7,7 @@ sns.set_theme(style="whitegrid")
 
 instances = ['A-n45-k7', 'E-n101-k14', 'P-n101-k4']
 folders = ['A', 'E', 'P']
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
 
 output_dir = '../../results/infographics/convergence'
 os.makedirs(output_dir, exist_ok=True)
@@ -36,5 +37,5 @@ for inst, folder in zip(instances, folders):
         print(f"Salvato {out_file}")
     else:
         print(f"File non trovato: {file_path}")
-
+        
 print("Fatto!")
