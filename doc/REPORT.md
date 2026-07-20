@@ -171,7 +171,7 @@ Per contrastare l'ingabbiamento geometrico delle istanze quasi sature (es. A-n45
 
 $$\alpha = \max\left(0.0, \min\left(1.0, \frac{\text{Saturazione} - 0.80}{0.95 - 0.80}\right)\right)$$
 
-![Funzione fuzzy: modulazione stocastica](../results/infographics/fuzzy_logic.png)
+![Funzione fuzzy: modulazione stocastica](assets/fuzzy_function.png)
 *Figura: Andamento della funzione di membership fuzzy. La fascia di transizione (80%-95%) modula dolcemente il parametro $\alpha$ da 0 a 1. Come evidenziato dalla linea tratteggiata, le istanze critiche come A-n45-k6 operano a regime completamente saturo ($\alpha = 1$).*
 
 Questo parametro viene usato per interpolare linearmente le probabilità degli operatori inter-rotta, adattando dinamicamente il focus dell'algoritmo dall'esplorazione distruttiva alla preservazione della fattibilità.
