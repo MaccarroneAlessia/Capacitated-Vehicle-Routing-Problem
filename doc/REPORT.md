@@ -74,18 +74,18 @@ graph TD
     J -- "sì" --> B
     J -- "no" --> K["Restituisci<br>Miglior Anticorpo"]
 
-    %% Colori
-    style A fill:#e6efff,stroke:#6b7280
-    style B fill:#e6efff,stroke:#6b7280
-    style C fill:#e6efff,stroke:#6b7280
-    style D fill:#ffedd5,stroke:#fdba74
-    style E fill:#fef3c7,stroke:#fcd34d
-    style F fill:#fef3c7,stroke:#fcd34d
-    style G fill:#e6efff,stroke:#6b7280
-    style H fill:#e6efff,stroke:#6b7280
-    style I fill:#e6efff,stroke:#6b7280
-    style J fill:#ffedd5,stroke:#fdba74
-    style K fill:#dcfce7,stroke:#86efac
+    %% Colori Vivaci con Testo Nero
+    style A fill:#93c5fd,stroke:#2563eb,stroke-width:2px,color:#000000
+    style B fill:#93c5fd,stroke:#2563eb,stroke-width:2px,color:#000000
+    style C fill:#93c5fd,stroke:#2563eb,stroke-width:2px,color:#000000
+    style D fill:#fdba74,stroke:#ea580c,stroke-width:2px,color:#000000
+    style E fill:#fde047,stroke:#ca8a04,stroke-width:2px,color:#000000
+    style F fill:#fde047,stroke:#ca8a04,stroke-width:2px,color:#000000
+    style G fill:#93c5fd,stroke:#2563eb,stroke-width:2px,color:#000000
+    style H fill:#93c5fd,stroke:#2563eb,stroke-width:2px,color:#000000
+    style I fill:#93c5fd,stroke:#2563eb,stroke-width:2px,color:#000000
+    style J fill:#fdba74,stroke:#ea580c,stroke-width:2px,color:#000000
+    style K fill:#86efac,stroke:#16a34a,stroke-width:2px,color:#000000
 ```
 
 ---
