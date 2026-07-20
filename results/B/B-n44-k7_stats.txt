@@ -1,6 +1,7 @@
 Instance: B-n44-k7
-Best Cost: 935.8200651986785
-Mean Cost: 955.0668224861816
-StdDev Cost: 24.327873857329678
-Mean Iterations (Evaluations): 101430.8
+Best Cost: 939.5908675154456
+Mean Cost: 976.4421288083174
+StdDev Cost: 32.85156035262814
+Mean FE (Evaluations): 122684.0
+Mean Generations (While Iterations): 617.0
 Satisfability: 43/43

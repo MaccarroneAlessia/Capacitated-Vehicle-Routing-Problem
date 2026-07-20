@@ -1,6 +1,7 @@
 Instance: A-n34-k5
-Best Cost: 787.430439254024
-Mean Cost: 795.7906911675133
-StdDev Cost: 15.362523075863809
-Mean Iterations (Evaluations): 136500.0
+Best Cost: 788.796086486464
+Mean Cost: 792.611306193205
+StdDev Cost: 4.421788756809548
+Mean FE (Evaluations): 60980.0
+Mean Generations (While Iterations): 305.4
 Satisfability: 33/33

@@ -1,6 +1,7 @@
 Instance: E-n101-k14
-Best Cost: 1155.3233986392718
-Mean Cost: 1195.5998463133421
-StdDev Cost: 32.91778950045651
-Mean Iterations (Evaluations): 138300.0
+Best Cost: 1165.739431868347
+Mean Cost: 1217.4456799784004
+StdDev Cost: 68.63660114739088
+Mean FE (Evaluations): 121340.0
+Mean Generations (While Iterations): 607.2
 Satisfability: 100/100

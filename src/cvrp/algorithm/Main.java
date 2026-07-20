@@ -45,13 +45,13 @@ public class Main {
             return;
         }
 
-        // Standard benchmark set containing specific instances requested by the professor
         Set<String> requiredInstances = new HashSet<>(Arrays.asList(
-                "A-n32-k5.vrp", "A-n45-k6.vrp", "A-n45-k7.vrp", "A-n60-k9.vrp", "A-n80-k10.vrp",
+                "A-n45-k7.vrp", "A-n60-k9.vrp", "A-n80-k10.vrp",
                 "B-n56-k7.vrp", "B-n66-k9.vrp", "B-n78-k10.vrp",
                 "E-n76-k8.vrp", "E-n101-k14.vrp",
-                "P-n50-k10.vrp", "P-n101-k4.vrp"));
-
+                "P-n50-k10.vrp", "P-n101-k4.vrp"
+        ));
+        
         if (liveMode) {
             requiredInstances.clear();
             requiredInstances.add(targetInstance + ".vrp");
@@ -92,16 +92,18 @@ public class Main {
         if (!liveMode) {
             // Write CSV Headers for aggregate summaries
             try (FileWriter w = new FileWriter(globalSummaryPath.toFile())) {
-                w.write("Instance,BestCost,MeanCost,StdDevCost,MeanIterations,Satisfability\n");
+                w.write("Instance,BestCost,MeanCost,StdDevCost,MeanFE,MeanGenerations,Satisfability\n");
             } catch (IOException e) {
                 e.printStackTrace();
             }
             try (FileWriter w = new FileWriter(topicSummaryPath.toFile())) {
-                w.write("Instance,BestCost,MeanCost,StdDevCost,MeanIterations,Satisfability\n");
+                w.write("Instance,BestCost,MeanCost,StdDevCost,MeanFE,MeanGenerations,Satisfability\n");
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+
+        long globalStartTime = System.currentTimeMillis();
 
         for (File instanceFile : instanceFiles) {
             if (instanceFile.getName().equals("A-n45-k6.vrp")) {
@@ -120,8 +122,11 @@ public class Main {
 
                 double[] bestCosts = new double[numRuns];
                 int[] bestEvals = new int[numRuns];
+                int[] bestIters = new int[numRuns];
                 Antibody globalBest = null;
 
+                long startInstanceTime = System.currentTimeMillis();
+                
                 // Execute independent runs for statistical robustness
                 for (int run = 0; run < numRuns; run++) {
                     System.out.println("  Run " + (run + 1) + "/" + numRuns);
@@ -152,10 +157,15 @@ public class Main {
                         });
 
                         // Start execution block
+                        long startRunTime = System.currentTimeMillis();
                         Antibody best = clonalg.run();
+                        long endRunTime = System.currentTimeMillis();
+                        long elapsedMs = endRunTime - startRunTime;
+                        
                         bestCosts[run] = best.getFitness();
                         bestEvals[run] = clonalg.getBestEvaluations();
-                        System.out.println("    Best Cost: " + best.getFitness() + " (at eval " + bestEvals[run] + ")");
+                        bestIters[run] = clonalg.getBestIteration();
+                        System.out.println("    Best Cost: " + best.getFitness() + " (at eval " + bestEvals[run] + ", gen " + bestIters[run] + "/" + clonalg.getTotalIterations() + ") - Time: " + elapsedMs + " ms");
 
                         if (isLive) {
                             Path liveFramesPath = Paths.get(resultsDir, "live_frames.json");
@@ -174,6 +184,9 @@ public class Main {
                         }
                     }
                 }
+                
+                long endInstanceTime = System.currentTimeMillis();
+                System.out.println("  Instance total time: " + (endInstanceTime - startInstanceTime) + " ms");
 
                 // Calcolo statistiche finali
                 double sum = 0;
@@ -206,10 +219,15 @@ public class Main {
                 String satisfability = visitedCustomers + "/" + instance.customers.size();
 
                 double sumEvals = 0;
+                double sumIters = 0;
                 for (int e : bestEvals) {
                     sumEvals += e;
                 }
+                for (int it : bestIters) {
+                    sumIters += it;
+                }
                 double meanEvals = sumEvals / numRuns;
+                double meanIters = sumIters / numRuns;
 
                 // Scrittura file statistiche specifico per istanza
                 String statsFileName = familyDir.resolve(instance.name + "_stats.txt").toString();
@@ -218,13 +236,14 @@ public class Main {
                     w.write("Best Cost: " + bestCost + "\n");
                     w.write("Mean Cost: " + mean + "\n");
                     w.write("StdDev Cost: " + stdDev + "\n");
-                    w.write("Mean Iterations (Evaluations): " + meanEvals + "\n");
+                    w.write("Mean FE (Evaluations): " + meanEvals + "\n");
+                    w.write("Mean Generations (While Iterations): " + meanIters + "\n");
                     w.write("Satisfability: " + satisfability + "\n");
                 }
 
                 // Scrittura dei log globali e per famiglia
                 if (!liveMode) {
-                    String line = instance.name + "," + bestCost + "," + mean + "," + stdDev + "," + meanEvals + ","
+                    String line = instance.name + "," + bestCost + "," + mean + "," + stdDev + "," + meanEvals + "," + meanIters + ","
                             + satisfability + "\n";
                     
                     try (FileWriter w = new FileWriter(globalSummaryPath.toFile(), true)) {
@@ -242,7 +261,7 @@ public class Main {
                     boolean writeHeader = !famFile.exists();
                     try (FileWriter w = new FileWriter(famFile, true)) {
                         if (writeHeader) {
-                            w.write("Instance,BestCost,MeanCost,StdDevCost,MeanIterations,Satisfability\n");
+                            w.write("Instance,BestCost,MeanCost,StdDevCost,MeanFE,MeanGenerations,Satisfability\n");
                         }
                         w.write(line);
                     }
@@ -267,7 +286,7 @@ public class Main {
                     for (int i = 0; i < globalBest.routes.size(); i++) {
                         Route r = globalBest.routes.get(i);
                         w.write("    [");
-                        w.write(r.nodes.stream().map(n -> "[" + n.x + ", " + n.y + "]")
+                        w.write(r.nodes.stream().map(n -> "{\"id\": " + n.id + ", \"x\": " + n.x + ", \"y\": " + n.y + ", \"demand\": " + n.demand + "}")
                                 .collect(Collectors.joining(", ")));
                         w.write("]" + (i < globalBest.routes.size() - 1 ? ",\n" : "\n"));
                     }
@@ -280,7 +299,8 @@ public class Main {
                 e.printStackTrace();
             }
         }
-        System.out.println("Tutte le run sono terminate! I risultati sono in " + resultsDir + "/");
+        long globalEndTime = System.currentTimeMillis();
+        System.out.println("Tutte le run sono terminate in " + (globalEndTime - globalStartTime) + " ms! I risultati sono in " + resultsDir + "/");
     }
 
     /**
@@ -305,7 +325,8 @@ public class Main {
         for (int i = 0; i < globalBest.routes.size(); i++) {
             Route r = globalBest.routes.get(i);
             sb.append("    [");
-            sb.append(r.nodes.stream().map(n -> "[" + n.x + ", " + n.y + "]").collect(Collectors.joining(", ")));
+            sb.append(r.nodes.stream().map(n -> "{\"id\": " + n.id + ", \"x\": " + n.x + ", \"y\": " + n.y + ", \"demand\": " + n.demand + "}")
+                    .collect(Collectors.joining(", ")));
             sb.append("]").append(i < globalBest.routes.size() - 1 ? ",\n" : "\n");
         }
         sb.append("  ]\n");

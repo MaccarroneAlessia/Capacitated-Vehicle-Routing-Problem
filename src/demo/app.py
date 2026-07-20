@@ -1,9 +1,9 @@
 """
 Dashboard interattiva (Streamlit) per i risultati del CVRP.
+LINK: https://capacitated-vehicle-routing-problem-jgnez4bsdkxthgvrgfs9mk.streamlit.app/
 
-Legge gli output prodotti dall'algoritmo Java (CSV di convergenza, JSON delle
-soluzioni, statistiche) e li mostra in tre viste: esecuzione live, analisi
-dettagliata di una singola istanza, walkthrough didattico dell'algoritmo.
+pip install -r requirements.txt
+streamlit run src/demo/app.py
 """
 
 import streamlit as st
@@ -15,8 +15,9 @@ import os
 import glob
 import subprocess
 import time
+import scipy.stats as stats
 
-# Root del progetto, indipendentemente da dove viene lanciato lo script
+# Root del progetto
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 os.chdir(PROJECT_ROOT)
 
@@ -24,66 +25,56 @@ os.chdir(PROJECT_ROOT)
 st.set_page_config(page_title="CVRP Optimizer Dashboard", page_icon="🚚", layout="wide", initial_sidebar_state="auto")
 
 RESULTS_DIR = "results"
+DATA_DIR = "data"
 
-# ---------------------------------------------------------------------------
-# Tema grafico condiviso da tutti i chart Plotly della dashboard
-# ---------------------------------------------------------------------------
-BG = "#0e1117"
-GRID = "rgba(255,255,255,0.08)"
-TEXT = "#e6e6e6"
-ACCENT = "#2dd4bf"     # teal - colore principale
-DEPOT_COLOR = "#f87171"  # rosso corallo per il deposito
-HOVER_BG = "#1e1e1e"
-ROUTE_LINE_COLOR = "#111"
-HIGHLIGHT_COLOR = "#134e4a"
-INACTIVE_TEXT = "#888888"
-SUCCESS_COLOR = "#4ade80"
-WARNING_COLOR = "orange"
-YELLOW_WARNING = "#facc15"
-WHITE = "white"
-TRANSPARENT = "rgba(0,0,0,0)"
-RANK_GRADIENT = ["#2dd4bf", "#25a693", "#1c7871", "#144a4f", "#0b1c2c"]
+PROTOCOL_INSTANCES = [
+    "A-n45-k7", "A-n60-k9", "A-n80-k10",
+    "B-n56-k7", "B-n66-k9", "B-n78-k10",
+    "E-n76-k8", "E-n101-k14",
+    "P-n50-k10", "P-n101-k4"
+]
+
+HIGHLIGHT_GREEN = "#4ade80"  # Verde per i minimi
+HIGHLIGHT_RED = "#991b1b"    # Bordeaux per i massimi
 
 ROUTE_PALETTE = [
-    ACCENT, "#60a5fa", "#f472b6", YELLOW_WARNING, "#a78bfa",
-    SUCCESS_COLOR, "#fb923c", "#38bdf8", "#e879f9", "#fbbf24",
-    "#94a3b8", DEPOT_COLOR,
+    "#2dd4bf", "#60a5fa", "#f472b6", "#facc15", "#a78bfa",
+    "#4ade80", "#fb923c", "#38bdf8", "#e879f9", "#fbbf24",
+    "#94a3b8", "#f87171",
 ]
 
 def style_fig(fig, title=None, height=420):
     fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor=BG,
-        plot_bgcolor=BG,
-        font=dict(color=TEXT, size=13),
-        title=dict(text=title, font=dict(size=17, color=WHITE)) if title else None,
+        title=dict(text=title, font=dict(size=17)) if title else None,
         margin=dict(l=40, r=20, t=50 if title else 20, b=40),
         height=height,
-        legend=dict(bgcolor=TRANSPARENT),
-        hoverlabel=dict(bgcolor=HOVER_BG, font_size=12),
     )
-    fig.update_xaxes(gridcolor=GRID, zerolinecolor=GRID)
-    fig.update_yaxes(gridcolor=GRID, zerolinecolor=GRID)
     return fig
 
-
-def route_map_figure(depot, routes, title, cost=None):
+def route_map_figure(depot, routes, title, cost=None, demands=None):
     fig = go.Figure()
     for i, route in enumerate(routes):
-        if not route:
-            continue
-        xs = [depot[0]] + [n[0] for n in route] + [depot[0]]
-        ys = [depot[1]] + [n[1] for n in route] + [depot[1]]
+        if not route: continue
+        xs = [depot[0]] + [(n["x"] if isinstance(n, dict) else n[0]) for n in route] + [depot[0]]
+        ys = [depot[1]] + [(n["y"] if isinstance(n, dict) else n[1]) for n in route] + [depot[1]]
+        n_ids = ["-"] + [(str(n["id"]) if isinstance(n, dict) else "?") for n in route] + ["-"]
+        
+        if demands:
+            n_costs = ["Dep"] + [str(demands.get(int(nid), 0)) if str(nid).isdigit() else "?" for nid in n_ids[1:-1]] + ["Dep"]
+        else:
+            n_costs = [""] * len(xs)
+
         color = ROUTE_PALETTE[i % len(ROUTE_PALETTE)]
         fig.add_trace(go.Scatter(
-            x=xs, y=ys, mode="lines+markers", name=f"Veicolo {i+1}",
+            x=xs, y=ys, mode="lines+markers+text", name=f"Veicolo {i+1}",
+            customdata=n_ids, text=n_costs, textposition="top center", textfont=dict(size=10, color=color),
             line=dict(color=color, width=2.5),
-            marker=dict(size=7, color=color, line=dict(width=1, color=ROUTE_LINE_COLOR)),
-            hovertemplate=f"Veicolo {i+1}<br>x=%{{x:.1f}}, y=%{{y:.1f}}<extra></extra>",
+            marker=dict(size=7, color=color, line=dict(width=1, color="black")),
+            hovertemplate=f"Veicolo {i+1}<br>Cliente ID: %{{customdata}}<br>x=%{{x:.1f}}, y=%{{y:.1f}}<br>Domanda: %{{text}}<extra></extra>",
         ))
     fig.add_trace(go.Scatter(
         x=[depot[0]], y=[depot[1]], mode="markers", name="Deposito",
-        marker=dict(symbol="star", size=20, color=DEPOT_COLOR, line=dict(width=1, color=WHITE)),
+        marker=dict(symbol="star", size=20, color="#f87171", line=dict(width=1, color="white")),
         hovertemplate="Deposito<extra></extra>",
     ))
     full_title = title if cost is None else f"{title} — costo {cost:.2f}"
@@ -91,562 +82,336 @@ def route_map_figure(depot, routes, title, cost=None):
     fig.update_yaxes(scaleanchor="x", scaleratio=1)
     return fig
 
-
-# ---------------------------------------------------------------------------
-# Caricamento dati
-# ---------------------------------------------------------------------------
+# --- Dati ---
+@st.cache_data
 def load_global_summary():
-    summary_file = os.path.join(RESULTS_DIR, "global_summary.csv")
-    if os.path.exists(summary_file):
-        return pd.read_csv(summary_file)
+    sf = os.path.join(RESULTS_DIR, "global_summary.csv")
+    return pd.read_csv(sf) if os.path.exists(sf) else None
+
+@st.cache_data
+def get_available_instances():
+    jf = glob.glob(os.path.join(RESULTS_DIR, "*", "*_best_solution.json"))
+    if not jf: jf = glob.glob(os.path.join(RESULTS_DIR, "*_best_solution.json"))
+    return [os.path.basename(f).replace("_best_solution.json", "") for f in jf]
+
+@st.cache_data
+def load_family_summary():
+    sf = os.path.join(RESULTS_DIR, "global_summary.csv")
+    if os.path.exists(sf):
+        df = pd.read_csv(sf)
+        df['Family'] = df['Instance'].str[0]
+        df['Gap%'] = ((df['MeanCost'] - df['BestCost']) / df['BestCost']) * 100
+        df['CV%'] = (df['StdDevCost'] / df['MeanCost']) * 100
+        return df
     return None
 
-def get_available_instances():
-    json_files = glob.glob(os.path.join(RESULTS_DIR, "*", "*_best_solution.json"))
-    if not json_files:
-        json_files = glob.glob(os.path.join(RESULTS_DIR, "*_best_solution.json"))
-    return [os.path.basename(f).replace("_best_solution.json", "") for f in json_files]
+@st.cache_data
+def load_saturation_data():
+    sf = os.path.join(RESULTS_DIR, "global_summary.csv")
+    if not os.path.exists(sf): return None
+    df = pd.read_csv(sf)
+    rows = []
+    for _, r in df.iterrows():
+        i = r['Instance']
+        f = i[0]
+        jp = os.path.join(RESULTS_DIR, f, f"{i}_best_solution.json")
+        if os.path.exists(jp):
+            with open(jp, 'r') as file:
+                d = json.load(file)
+                loads = d.get('loads', [])
+                cap = d.get('capacity', 1)
+                nv = len(loads) if len(loads)>0 else 1
+                sat = (sum(loads)/(cap*nv))*100 if cap*nv>0 else 0
+                gap = ((r['MeanCost']-r['BestCost'])/r['BestCost'])*100
+                rows.append({'Instance': i, 'Saturation%': sat, 'Gap%': gap, 'Family': f})
+    return pd.DataFrame(rows)
 
+@st.cache_data
+def load_vrp_demands(instance_name):
+    vp = os.path.join(DATA_DIR, instance_name[0], f"{instance_name}.vrp")
+    demands = {}
+    cap = 0
+    if os.path.exists(vp):
+        with open(vp, 'r') as f:
+            in_d = False
+            for line in f:
+                if line.strip().startswith("CAPACITY"):
+                    parts = line.strip().split(":")
+                    if len(parts)>=2: cap = int(parts[1].strip())
+                if line.startswith("DEMAND_SECTION"): in_d=True; continue
+                if line.startswith("DEPOT_SECTION") or line.startswith("EOF"): in_d=False
+                if in_d:
+                    p = line.strip().split()
+                    if len(p)>=2: demands[int(p[0])] = int(p[1])
+    return demands, cap
 
+# --- UI TOP ---
 st.title("🚚 Capacitated Vehicle Routing Problem (CVRP)")
-st.caption("Algoritmo memetico: selezione clonale + Large Neighborhood Search + Simulated Annealing")
 
 instances = get_available_instances()
 if not instances:
-    st.error(f"Nessun risultato nella cartella '{RESULTS_DIR}'. Esegui prima l'algoritmo Java.")
+    st.error(f"Nessun risultato in '{RESULTS_DIR}'.")
     st.stop()
 
-if "shared_instance" not in st.session_state:
-    st.session_state.shared_instance = sorted(instances)[0]
+if "shared_instance" not in st.session_state: st.session_state.shared_instance = sorted(instances)[0]
+def update_from_live(): st.session_state.shared_instance = st.session_state.live_sel
+def update_from_analysis(): st.session_state.shared_instance = st.session_state.analysis_sel
 
-def update_from_live():
-    st.session_state.shared_instance = st.session_state.live_sel
-
-def update_from_analysis():
-    st.session_state.shared_instance = st.session_state.analysis_sel
-
-st.sidebar.markdown("### 🔗 Istanze di riferimento")
-st.sidebar.markdown("""
-Dataset [CVRPLIB](http://vrp.galgos.inf.puc-rio.br/index.php/en/):
-- **A**: A-n45-k7, A-n60-k9, A-n80-k10
-- **B**: B-n56-k7, B-n66-k9, B-n78-k10
-- **E**: E-n76-k8, E-n101-k14
-- **P**: P-n50-k10, P-n101-k4
+st.header("1. Il Problema CVRP")
+st.markdown(r"""
+Il **CVRP** è una sfida di ottimizzazione logistica (NP-Hard).
+**Obiettivo:** Minimizzare la distanza totale $\min \sum d_{ij} x_{ijk}$
+**Vincolo:** Nessun veicolo supera la capacità $\sum q_i y_{ik} \le C$
 """)
 
-# ---------------------------------------------------------------------------
-# Introduzione all'algoritmo 
-# ---------------------------------------------------------------------------
-st.header("🧠 Come funziona l'algoritmo")
+st.header("2. La Soluzione (Algoritmo NN_LNS)")
 st.markdown("""
-È un algoritmo memetico ispirato alla selezione clonale del sistema immunitario: le rotte sono
-"anticorpi" che competono per adattarsi meglio al problema. L'obiettivo è minimizzare la distanza
-totale percorsa senza mai superare la capacità dei veicoli.
-
-Per evitare che restasse bloccato in soluzioni sub-ottime, sono stati aggiunti tre elementi:
-
-- **Partenza intelligente** — il 20% della popolazione iniziale non è casuale ma costruita con il
-  criterio del vicino più prossimo, così si parte già da un costo basso invece che da un groviglio.
-- **Ruin & Recreate (LNS)** — invece di scambiare due nodi alla volta, l'algoritmo a volte smonta
-  interi tratti di rotta e li ricolloca dove convengono davvero, anche su un altro veicolo.
-- **Simulated Annealing nella 2-Opt** — durante la ricerca locale, accetta anche mosse che
-  peggiorano temporaneamente il costo (con probabilità $P = e^{-\\Delta/T}$, decrescente nel
-  tempo). È questo che permette di uscire dai minimi locali visibili come "gradini" nel grafico
-  di convergenza.
+Il motore risolutivo è un **Algoritmo Immunologico** basato sulla Selezione Clonale, potenziato da due operatori euristici chiave:
+- **Nearest Neighbor (NN)**: Costruzione iniziale intelligente per il 20% della popolazione, accelerando la convergenza.
+- **Large Neighborhood Search (LNS)**: Operatore distruttivo ("Ruin & Recreate") per le ipermutazioni dei cloni.
 """)
 
-st.header("1. Studio di Ablazione")
-st.markdown("""
-L'**Ablation Study** misura rigorosamente l'impatto delle singole euristiche sul modello baseline disattivando alternativamente moduli dell'architettura Java.
-Sono state scelte 4 istanze target (`A-n32-k5`, `B-n56-k7`, `E-n101-k14`, `A-n45-k6`) per rappresentare ciascuna famiglia ed includere casi limite (es. altissima saturazione).
-""")
+st.header("3. Studio di Ablazione")
+ablation_csv = os.path.join(RESULTS_DIR, "ablations", "ablation_global_metrics.csv")
+if os.path.exists(ablation_csv):
+    df_abl_full = pd.read_csv(ablation_csv)
+    cA, cB = st.columns(2)
+    with cA:
+        st.subheader("Globali (85 Istanze)")
+        bc = df_abl_full.groupby('Instance')['Cost'].min()
+        df_abl_full['Gap%'] = df_abl_full.apply(lambda r: (r['Cost']-bc[r['Instance']])/bc[r['Instance']]*100, axis=1)
+        st85 = df_abl_full.groupby('Configuration').agg({'Gap%':'mean','TimeMs':'mean'}).sort_values('Gap%')
+        st.dataframe(st85.style.format({'Gap%':'{:.2f}%','TimeMs':'{:.0f} ms'}).highlight_min(subset=['Gap%','TimeMs'],color=HIGHLIGHT_GREEN).highlight_max(subset=['Gap%','TimeMs'],color=HIGHLIGHT_RED), use_container_width=True)
+    with cB:
+        st.subheader("Protocollo (10 Istanze)")
+        df_p = df_abl_full[df_abl_full['Instance'].isin(PROTOCOL_INSTANCES)].copy()
+        pb = df_p.groupby('Instance')['Cost'].min()
+        df_p['Gap%'] = df_p.apply(lambda r: (r['Cost']-pb[r['Instance']])/pb[r['Instance']]*100, axis=1)
+        st10 = df_p.groupby('Configuration').agg({'Gap%':'mean','TimeMs':'mean'}).sort_values('Gap%')
+        w = df_p.loc[df_p.groupby('Instance')['Cost'].idxmin()]['Configuration'].value_counts()
+        st.dataframe(st10.style.format({'Gap%':'{:.2f}%','TimeMs':'{:.0f} ms'}).highlight_min(subset=['Gap%','TimeMs'],color=HIGHLIGHT_GREEN).highlight_max(subset=['Gap%','TimeMs'],color=HIGHLIGHT_RED), use_container_width=True)
+        st.caption(f"🏆 Vittorie assolute nel set protocollo: **NN_LNS ({w.get('nn_lns',0)}/10)**")
 
-target_instances = ['A-n32-k5', 'B-n56-k7', 'E-n101-k14', 'A-n45-k6']
-configs = ['baseline', 'nn', 'sa', 'lns', 'nn_sa', 'nn_lns', 'sa_lns', 'all']
-labels = ['Baseline', 'Solo NN', 'Solo SA', 'Solo LNS', 'NN+SA', 'NN+LNS', 'SA+LNS', 'Full (Tutti e 3)']
+st.header("4. Analisi Aggregata e Strutturale")
+df_all = load_family_summary()
+if df_all is not None:
+    cF1, cF2 = st.columns([1, 2])
+    with cF1:
+        fsum = df_all.groupby('Family').agg({'Instance':'count','Gap%':'mean','CV%':'mean'})
+        st.dataframe(fsum.style.format({'Gap%':'{:.2f}%','CV%':'{:.2f}%'}), use_container_width=True)
+    with cF2:
+        ds = load_saturation_data()
+        if ds is not None and not ds.empty:
+            r, p_val = stats.pearsonr(ds['Saturation%'], ds['Gap%'])
+            f_sat = go.Figure()
+            for fam in ds['Family'].unique():
+                df_f = ds[ds['Family']==fam]
+                f_sat.add_trace(go.Scatter(x=df_f['Saturation%'], y=df_f['Gap%'], mode='markers', name=f"Famiglia {fam}"))
+            m, b = np.polyfit(ds['Saturation%'], ds['Gap%'], 1)
+            xr = np.linspace(ds['Saturation%'].min(), ds['Saturation%'].max(), 100)
+            f_sat.add_trace(go.Scatter(x=xr, y=m*xr+b, mode='lines', name="Trendline", line=dict(color='red',dash='dash')))
+            f_sat.update_layout(title=f"Saturazione vs Gap (Pearson r={r:.3f})", height=350, margin=dict(l=20,r=20,t=40,b=20))
+            st.plotly_chart(f_sat, use_container_width=True)
 
-results = []
-for instance in target_instances:
-    row = {'Istanza': instance}
-    for conf, label in zip(configs, labels):
-        csv_file = os.path.join(RESULTS_DIR, 'ablations', instance, f'{instance}_ablation_{conf}_convergence.csv')
-        if os.path.exists(csv_file):
-            df = pd.read_csv(csv_file)
-            row[label] = df['BestCost'].iloc[-1]
-        else:
-            row[label] = None
-    results.append(row)
-
-df_abl = pd.DataFrame(results)
-if not df_abl.empty and df_abl['Full (Tutti e 3)'].notna().any():
-    st.dataframe(df_abl.style.highlight_min(subset=labels, color=HIGHLIGHT_COLOR, axis=1).format({col: "{:.2f}" for col in labels}), use_container_width=True)
-    st.caption("Il modello 'Full' risulta la scelta vincente nella maggior parte dei contesti, giustificando la sinergia degli operatori memetici.")
-else:
-    st.info("Dati dell'ablation study non disponibili. Assicurati di aver generato la cartella results/ablations.")
-
-st.header("2. Risultati Istanze Consegna (Best Model)")
-st.markdown("Prestazioni del modello completo sulle istanze ufficialmente suggerite dalla specifica di progetto (Set A, B, E, P).")
-df_global = load_global_summary()
-
-if df_global is not None and not df_global.empty:
-    st.dataframe(
-        df_global.style.highlight_min(subset=['BestCost', 'MeanCost', 'StdDevCost', 'MeanIterations'], color=HIGHLIGHT_COLOR),
-        use_container_width=True
-    )
-    st.caption(
-        "La bassa deviazione standard conferma un eccellente equilibrio tra exploitation ed exploration; "
-        "la Satisfability garantisce l'assenza di violazioni del vincolo di capacità."
-    )
-else:
-    st.warning("Riepilogo statistico globale vuoto o non trovato. Esegui l'algoritmo Java per generarlo.")
-
-st.header("3. Riepilogo Statistico per Famiglia")
-st.markdown("Metriche aggregate calcolate sull'intero dataset elaborato, raggruppate per macro-famiglie (A, B, E, P).")
-all_summary_file = os.path.join(RESULTS_DIR, "global_summary_all.csv")
-if os.path.exists(all_summary_file):
-    df_all = pd.read_csv(all_summary_file)
-    df_all['Family'] = df_all['Instance'].str[0]
-    df_all['Gap%'] = ((df_all['MeanCost'] - df_all['BestCost']) / df_all['BestCost']) * 100
-    
-    family_summary = df_all.groupby('Family').agg({
-        'Instance': 'count',
-        'BestCost': 'mean',
-        'Gap%': 'mean',
-        'StdDevCost': 'mean',
-        'MeanIterations': 'mean'
-    }).reset_index().rename(columns={'Instance': 'N. Istanze', 'BestCost': 'Costo Medio', 'Gap%': 'Gap Medio (%)'})
-    
-    st.dataframe(family_summary.style.format({
-        'Costo Medio': '{:.2f}', 'Gap Medio (%)': '{:.2f}%', 'StdDevCost': '{:.2f}', 'MeanIterations': '{:.0f}'
-    }).highlight_min(subset=['Gap Medio (%)', 'StdDevCost'], color=HIGHLIGHT_COLOR), use_container_width=True)
-else:
-    st.info("Dati aggregati per famiglia (global_summary_all.csv) non trovati.")
+st.header("5. Risultati Istanze Protocollo")
+tc = os.path.join(RESULTS_DIR, "topic_summary.csv")
+if os.path.exists(tc):
+    dt = pd.read_csv(tc)
+    st.dataframe(dt.style.format({'BestCost':'{:.2f}','MeanCost':'{:.2f}','StdDevCost':'{:.2f}','MeanFE':'{:.0f}'}), use_container_width=True)
 
 st.divider()
 
-tab1, tab2, tab3 = st.tabs([
-    "▶️ Esecuzione Live",
+# --- TABS ---
+tab_walk, tab_analysis, tab_proto, tab_abl = st.tabs([
+    "🎓 Walkthrough (Codice & Demo)",
     "📈 Analisi Dettagliata",
-    "🎓 Walkthrough",
+    "📋 Istanze di Protocollo",
+    "⚖️ Ablation Visivo"
 ])
 
-# ---------------------------------------------------------------------------
-# TAB 1 — Live
-# ---------------------------------------------------------------------------
-with tab1:
-    st.header("Replay dell'esecuzione")
-    st.markdown("Scegli un'istanza, genera la simulazione, poi scorri i frame per vedere l'algoritmo evolvere.")
+# ----------------- TAB: WALKTHROUGH (CODICE + LIVE) -----------------
+with tab_walk:
+    st.header("🎓 Walkthrough: Architettura, Pseudocodice e Demo")
+    st.markdown("""
+### Architettura
+```text
++------------------------------------------------------------------------+
+|                           CORE JAVA ENGINE                             |
++------------------------------------------------------------------------+
+|                                                                        |
+| [ClonalSelection] --(Real-Time Fitness Loop)--> Scrittura Tabulare     |
+|                                                  (*_convergence.csv)   |
+|         |                                                              |
+|         v                                                              |
+| [JSON Exporter] ----(Dettaglio Topologico)----> Rotte Ottime           |
+|                                                  (*_best_solution.json)|
++------------------------------------------------------------------------+
+```
 
-    col_sel, col_btn = st.columns([2, 1])
-    with col_sel:
-        st.selectbox(
-            "Istanza", sorted(instances), key="live_sel",
-            index=sorted(instances).index(st.session_state.shared_instance),
-            on_change=update_from_live
-        )
+### Pseudocodice 
+```text
+1. Population = InitializePopulation(20% NearestNeighbor, 80% Random Feasible)
+2. WHILE (FitnessEvaluations < 350,000):
+3.     Ordina Population per Costo crescente (Affinità descrescente)
+4.     Selected = Seleziona i top N anticorpi
+5.     Clones = []
+6.     FOR EACH parent in Selected:
+7.         NumClones = Proporzionale al Rank(parent)
+8.         FOR c = 1 to NumClones:
+9.             clone = DeepCopy(parent)
+10.            NumMutations = Proporzionale Inverso al Rank(parent)
+11.            HyperMutate(clone, NumMutations)
+                   --> Seleziona operatore: [Swap, 2-Opt, Relocate, LNS]
+12.            RicalcolaFitness(clone)
+13.            Aggiungi clone a Clones
+14.    
+15.    Population.AddAll(Clones)
+16.    Ordina Population, tieni i top N
+17.    
+18.    ReceptorEditing: Rimpiazza peggiori con random feasible
+19. RETURN Best Antibody
+```
+    """)
+    
+    st.divider()
+    st.subheader("▶️ Demo Visualizzazione (Esecuzione Live)")
+    
+    c_sel, c_btn = st.columns([2, 1])
+    with c_sel:
+        st.selectbox("Istanza", sorted(instances), key="live_sel", index=sorted(instances).index(st.session_state.shared_instance), on_change=update_from_live)
         live_instance = st.session_state.shared_instance
-    with col_btn:
-        st.write("")
-        st.write("")
+    with c_btn:
+        st.write(""); st.write("")
         if st.button("🎬 Genera simulazione", type="primary", use_container_width=True):
-            status_placeholder = st.empty()
-            status_placeholder.info(f"⏳ Calcolo di {live_instance} in corso (circa 2 secondi)...")
-            process = subprocess.Popen(["java", "-cp", "bin", "cvrp.algorithm.Main", "--live", live_instance])
-            process.wait()
-
-            live_json_path = os.path.join(RESULTS_DIR, "live_frames.json")
-            if os.path.exists(live_json_path):
-                with open(live_json_path, 'r') as f:
-                    st.session_state.frames = json.load(f)
+            status = st.empty()
+            status.info(f"⏳ Calcolo di {live_instance} in corso...")
+            p = subprocess.Popen(["java", "-cp", "bin", "cvrp.algorithm.Main", "--live", live_instance])
+            p.wait()
+            lj = os.path.join(RESULTS_DIR, "live_frames.json")
+            if os.path.exists(lj):
+                with open(lj, 'r') as f: st.session_state.frames = json.load(f)
                 st.session_state.current_frame = 0
-                st.session_state.slider_frame = 0
+                st.session_state.auto_play = False
                 st.session_state.live_instance = live_instance
-                status_placeholder.success("✅ Simulazione pronta.")
+                status.success("✅ Simulazione pronta.")
             else:
-                status_placeholder.error("❌ Errore nella generazione dei frame.")
+                status.error("❌ Errore nella generazione.")
 
     if 'frames' in st.session_state and st.session_state.get('live_instance') == live_instance:
-        frames = st.session_state.frames
-        max_frame = len(frames) - 1
+        frs = st.session_state.frames
+        mf = len(frs) - 1
+        if 'current_frame' not in st.session_state: st.session_state.current_frame = 0
+        if 'auto_play' not in st.session_state: st.session_state.auto_play = False
 
-        if 'current_frame' not in st.session_state:
-            st.session_state.current_frame = 0
-        if 'auto_play' not in st.session_state:
-            st.session_state.auto_play = False
-
-        st.markdown("##### Controlli")
         c1, c2, c3, c4, c5 = st.columns(5)
-        if c1.button("⏮️ Inizio", use_container_width=True):
-            st.session_state.current_frame = 0
-            st.session_state.auto_play = False
-        if c2.button("◀️ Indietro", use_container_width=True):
-            st.session_state.current_frame = max(0, st.session_state.current_frame - 1)
-            st.session_state.auto_play = False
-        if c3.button("Avanti ▶️", use_container_width=True):
-            st.session_state.current_frame = min(max_frame, st.session_state.current_frame + 1)
-            st.session_state.auto_play = False
-        if c4.button("⏭️ Fine", use_container_width=True):
-            st.session_state.current_frame = max_frame
-            st.session_state.auto_play = False
+        if c1.button("⏮️ Inizio", use_container_width=True): st.session_state.current_frame = 0; st.session_state.auto_play = False
+        if c2.button("◀️ Indietro", use_container_width=True): st.session_state.current_frame = max(0, st.session_state.current_frame - 1); st.session_state.auto_play = False
+        if c3.button("Avanti ▶️", use_container_width=True): st.session_state.current_frame = min(mf, st.session_state.current_frame + 1); st.session_state.auto_play = False
+        if c4.button("⏭️ Fine", use_container_width=True): st.session_state.current_frame = mf; st.session_state.auto_play = False
         if c5.button("⏹️ Stop" if st.session_state.auto_play else "⏯️ Auto-Play", use_container_width=True):
             st.session_state.auto_play = not st.session_state.auto_play
-            if st.session_state.auto_play and st.session_state.current_frame == max_frame:
-                st.session_state.current_frame = 0
+            if st.session_state.auto_play and st.session_state.current_frame == mf: st.session_state.current_frame = 0
 
-        selected_frame = st.slider("Timeline", 0, max_frame, value=st.session_state.current_frame)
-        if selected_frame != st.session_state.current_frame:
-            st.session_state.current_frame = selected_frame
-            st.session_state.auto_play = False
-            st.rerun()
+        sf = st.slider("Timeline", 0, mf, value=st.session_state.current_frame)
+        if sf != st.session_state.current_frame:
+            st.session_state.current_frame = sf; st.session_state.auto_play = False; st.rerun()
 
-        metrics_placeholder = st.empty()
-        plot_placeholder = st.empty()
+        m_ph = st.empty()
+        p_ph = st.empty()
 
         def render_frame(f_idx):
-            frame = frames[f_idx]
-            current_cost = frame.get('cost', 0)
-            current_evals = frame.get('evaluations', 0)
-            max_evals = 350000
-
-            with metrics_placeholder.container():
-                colA, colB, colC = st.columns(3)
-                colA.metric("Costo", f"{current_cost:.2f}")
-                colB.metric("Valutazioni (FE)", f"{current_evals}")
-                colC.progress(min(current_evals / max_evals, 1.0))
-
-            fig = route_map_figure(
-                frame['depot'], frame.get('routes', []),
-                f"Frame {f_idx + 1}/{max_frame + 1}", cost=current_cost
-            )
-            with plot_placeholder.container():
-                st.plotly_chart(fig, use_container_width=True, key=f"live_frame_{f_idx}")
+            fr = frs[f_idx]
+            dems, _ = load_vrp_demands(live_instance)
+            with m_ph.container():
+                cA, cB, cC = st.columns(3)
+                cA.metric("Costo", f"{fr.get('cost', 0):.2f}")
+                cB.metric("Valutazioni (FE)", f"{fr.get('evaluations', 0)}")
+                cC.progress(min(fr.get('evaluations', 0) / 350000, 1.0))
+            fig = route_map_figure(fr['depot'], fr.get('routes', []), f"Frame {f_idx + 1}", cost=fr.get('cost', 0), demands=dems)
+            with p_ph.container():
+                st.plotly_chart(fig, use_container_width=True, key=f"lf_{f_idx}")
 
         render_frame(st.session_state.current_frame)
-
         if st.session_state.auto_play:
-            if st.session_state.current_frame < max_frame:
-                st.session_state.current_frame += 1
-                time.sleep(0.3)
-                st.rerun()
+            if st.session_state.current_frame < mf:
+                st.session_state.current_frame += 1; time.sleep(0.3); st.rerun()
             else:
-                st.session_state.auto_play = False
-                st.rerun()
+                st.session_state.auto_play = False; st.rerun()
 
-# ---------------------------------------------------------------------------
-# TAB 2 — Analisi dettagliata
-# ---------------------------------------------------------------------------
-with tab2:
+# ----------------- TAB: ANALISI DETTAGLIATA -----------------
+with tab_analysis:
     st.header("Analisi dettagliata")
+    c_s, _ = st.columns([2, 1])
+    with c_s:
+        st.selectbox("Istanza", sorted(instances), key="analysis_sel", index=sorted(instances).index(st.session_state.shared_instance), on_change=update_from_analysis)
+        si = st.session_state.shared_instance
 
-    col_sel_ana, _ = st.columns([2, 1])
-    with col_sel_ana:
-        st.selectbox(
-            "Istanza", sorted(instances), key="analysis_sel",
-            index=sorted(instances).index(st.session_state.shared_instance),
-            on_change=update_from_analysis
-        )
-        selected_instance = st.session_state.shared_instance
+    fam = si[0]
+    jf = os.path.join(RESULTS_DIR, fam, f"{si}_best_solution.json")
+    stf = os.path.join(RESULTS_DIR, fam, f"{si}_stats.txt")
+    if not os.path.exists(jf): jf = os.path.join(RESULTS_DIR, f"{si}_best_solution.json"); stf = os.path.join(RESULTS_DIR, f"{si}_stats.txt")
 
-    st.caption(f"Istanza corrente: **{selected_instance}**")
+    if os.path.exists(stf):
+        with open(stf, 'r') as f:
+            sd = {k.strip(): v.strip() for line in f if ":" in line for k, v in [line.split(":", 1)]}
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Best Cost", f"{float(sd.get('Best Cost', 0)):.2f}")
+        c2.metric("Mean Cost", f"{float(sd.get('Mean Cost', 0)):.2f}")
+        c3.metric("Iterazioni medie", f"{float(sd.get('Mean Iterations (Evaluations)', 0)):.0f}")
+        c4.metric("Satisfability", sd.get('Satisfability', 'N/A'))
 
-    family = selected_instance[0]
-    json_file = os.path.join(RESULTS_DIR, family, f"{selected_instance}_best_solution.json")
-    stats_file = os.path.join(RESULTS_DIR, family, f"{selected_instance}_stats.txt")
-    
-    # Fallback for old structure (if any remain)
-    if not os.path.exists(json_file):
-        json_file = os.path.join(RESULTS_DIR, f"{selected_instance}_best_solution.json")
-        stats_file = os.path.join(RESULTS_DIR, f"{selected_instance}_stats.txt")
+    if os.path.exists(jf):
+        with open(jf, 'r') as f: d = json.load(f)
+        dems, _ = load_vrp_demands(si)
+        fm = route_map_figure(d['depot'], d['routes'], f"Miglior soluzione trovata per {si}", cost=d['cost'], demands=dems)
+        st.plotly_chart(fm, use_container_width=True)
 
-    col1, col2, col3, col4 = st.columns(4)
-    if os.path.exists(stats_file):
-        with open(stats_file, 'r') as f:
-            stats = {}
-            for line in f:
-                if ":" in line:
-                    key, val = line.split(":", 1)
-                    stats[key.strip()] = val.strip()
+        lds = d.get('loads', [])
+        cap = d.get('capacity', 1)
+        if lds:
+            pl = [(l / cap) * 100 for l in lds]
+            fb = go.Figure(data=[go.Bar(x=[f"V{i+1}" for i in range(len(lds))], y=pl, text=[f"{l}/{cap}" for l in lds], textposition='auto', marker_color=["#ef4444" if p > 95 else "#2dd4bf" for p in pl])])
+            fb.add_hline(y=100, line_dash="dash", line_color="red", annotation_text="Capacità Massima")
+            fb = style_fig(fb, "Saturazione Capacità", height=350)
+            fb.update_yaxes(range=[0, max(110, max(pl) + 10)])
+            st.plotly_chart(fb, use_container_width=True)
 
-        col1.metric("Best Cost", f"{float(stats.get('Best Cost', 0)):.2f}")
-        col2.metric("Mean Cost", f"{float(stats.get('Mean Cost', 0)):.2f}")
-        col3.metric("Iterazioni medie", f"{float(stats.get('Mean Iterations (Evaluations)', 0)):.0f}")
-        col4.metric("Satisfability", stats.get('Satisfability', 'N/A'))
+# ----------------- TAB: PROTOCOLLO -----------------
+with tab_proto:
+    st.header("Infografiche Istanze di Protocollo")
+    sp = st.selectbox("Scegli l'istanza da visualizzare", PROTOCOL_INSTANCES)
+    pp = os.path.join(RESULTS_DIR, "infographics", f"{sp}_infographic.png")
+    if os.path.exists(pp): st.image(pp, use_container_width=True)
+    else: st.warning("Infografica non generata. Esegui utils/generate_infographic.py")
 
-    # --- Diagnostica Saturazione Bin-Packing ---
-    if os.path.exists(json_file):
-        with open(json_file, 'r') as f:
-            data = json.load(f)
-            
-        loads = data.get('loads', [])
-        capacity = data.get('capacity', 1)
-        
-        import re
-        match = re.search(r'-k(\d+)', selected_instance)
-        if match and loads:
-            k = int(match.group(1))
-            total_cap = k * capacity
-            total_demand = sum(loads)
-            saturation = (total_demand / total_cap) * 100
-            
-            st.divider()
-            
-            col_diag1, col_diag2 = st.columns([1, 4])
-            with col_diag1:
-                st.metric(
-                    "Saturazione Capacità", 
-                    f"{saturation:.1f}%", 
-                    help=f"Domanda totale ({total_demand}) divisa per Capacità totale di {k} veicoli ({total_cap})"
-                )
-            with col_diag2:
-                if saturation > 95:
-                    st.warning("⚠️ **Istanza a bin-packing quasi saturo (>95%)**. L'operatore LNS (Ruin & Recreate) potrebbe avere grosse difficoltà a trovare scambi fattibili a causa della mancanza di spazio libero nei veicoli, aumentando la deviazione standard tra run indipendenti.")
-                else:
-                    st.success("✅ **Saturazione regolare**. I veicoli hanno spazio di manovra sufficiente per permettere all'LNS scambi efficaci.")
+# ----------------- TAB: ABLATION VISUAL -----------------
+with tab_abl:
+    st.header("Studio di Ablazione Dettagliato")
+    tg = ['P-n16-k8', 'E-n101-k14', 'E-n23-k3', 'B-n57-k7']
+    cf = ['baseline', 'nn', 'sa', 'lns', 'nn_sa', 'nn_lns', 'sa_lns', 'all']
+    lb = ['Baseline', 'Solo NN', 'Solo SA', 'Solo LNS', 'NN+SA', 'NN+LNS', 'SA+LNS', 'Full']
+    sa = st.selectbox("Seleziona Istanza Ablation", tg)
+    fc = go.Figure()
+    fa = False
+    for c, l in zip(cf, lb):
+        csv = os.path.join(RESULTS_DIR, 'ablations', sa, f'{sa}_ablation_{c}_convergence.csv')
+        if os.path.exists(csv):
+            fa = True
+            dc = pd.read_csv(csv)
+            fc.add_trace(go.Scatter(x=dc['Generations'], y=dc['BestCost'], mode='lines', name=l))
+    if fa:
+        fc.update_layout(title=f"Convergenza Ablation: {sa}", height=500)
+        st.plotly_chart(fc, use_container_width=True)
+    else: st.warning("Dati di convergenza non trovati.")
 
-    st.divider()
-
-    if os.path.exists(json_file):
-        # We already loaded 'data' above, but just in case:
-        if 'data' not in locals():
-            with open(json_file, 'r') as f:
-                data = json.load(f)
-
-        col_conv, col_cap = st.columns(2)
-
-        # --- Convergenza ---
-        with col_conv:
-            fig_conv = go.Figure()
-            for run in range(5):
-                csv_file = os.path.join(RESULTS_DIR, family, f"{selected_instance}_run_{run}_convergence.csv")
-                if not os.path.exists(csv_file):
-                    csv_file = os.path.join(RESULTS_DIR, f"{selected_instance}_run_{run}_convergence.csv")
-                if os.path.exists(csv_file):
-                    df = pd.read_csv(csv_file)
-                    fig_conv.add_trace(go.Scatter(
-                        x=df['Evaluations'], y=df['BestCost'], mode="lines",
-                        name=f"Run {run + 1}", line=dict(width=2, color=ROUTE_PALETTE[run]),
-                    ))
-            fig_conv.update_xaxes(title_text="Valutazioni (FE)")
-            fig_conv.update_yaxes(title_text="Miglior costo trovato")
-            fig_conv = style_fig(fig_conv, "📉 Convergenza")
-            st.plotly_chart(fig_conv, use_container_width=True)
-
-        # --- Saturazione capacità ---
-        with col_cap:
-            loads = data.get('loads', [])
-            capacity = data.get('capacity', 1)
-            if loads:
-                percentages = [(l / capacity) * 100 for l in loads]
-                colors = [DEPOT_COLOR if p > 100 else ACCENT for p in percentages]
-                fig_cap = go.Figure(go.Bar(
-                    x=[f"V{i+1}" for i in range(len(loads))],
-                    y=percentages,
-                    marker_color=colors,
-                    text=[f"{p:.0f}%" for p in percentages],
-                    textposition="outside",
-                    hovertemplate="%{x}: %{y:.1f}%%<extra></extra>",
-                ))
-                fig_cap.add_hline(y=100, line_dash="dash", line_color=DEPOT_COLOR,
-                                   annotation_text="Capacità massima", annotation_font_color=DEPOT_COLOR)
-                fig_cap.update_yaxes(title_text="Carico (%)", range=[0, max(110, max(percentages) + 10)])
-                fig_cap = style_fig(fig_cap, "🚛 Saturazione veicoli")
-                st.plotly_chart(fig_cap, use_container_width=True)
-
-        # --- Mappa rotte ---
-        fig_map = route_map_figure(data['depot'], data['routes'], "🗺️ Rotte ottimizzate", cost=data['cost'])
-        st.plotly_chart(fig_map, use_container_width=True)
-
-        with st.expander("📖 Come leggere i grafici"):
-            st.markdown("""
-            **Convergenza** — il costo scende all'aumentare delle valutazioni. Una discesa ripida
-            all'inizio è merito della partenza intelligente (Nearest Neighbor); i "gradini" più
-            avanti indicano che l'algoritmo era bloccato e LNS o Simulated Annealing lo hanno sbloccato.
-
-            **Saturazione veicoli** — quanto ogni veicolo è riempito rispetto alla capacità massima
-            (linea tratteggiata). Idealmente le barre stanno vicine al 100%: significa usare meno
-            veicoli possibile, sfruttandoli al massimo.
-
-            **Mappa rotte** — la disposizione geografica di clienti e deposito. Rotte che si
-            incrociano a "clessidra" indicano margine di miglioramento; la 2-Opt le districa
-            automaticamente in percorsi più circolari.
-            """)
-
-# ---------------------------------------------------------------------------
-# TAB 3 — Walkthrough
-# ---------------------------------------------------------------------------
-with tab3:
-    st.header("🎓 Come lavora l'algoritmo, passo per passo")
-
-    if 'current_step' not in st.session_state:
-        st.session_state.current_step = 1
-
-    col_b1, col_b2, _ = st.columns([1, 1, 6])
-    with col_b1:
-        if st.button("⬅️ Indietro", use_container_width=True, disabled=(st.session_state.current_step == 1)):
-            st.session_state.current_step -= 1
-            st.rerun()
-    with col_b2:
-        if st.button("Avanti ➡️", use_container_width=True, disabled=(st.session_state.current_step == 7)):
-            st.session_state.current_step += 1
-            st.rerun()
-
-    st.progress(st.session_state.current_step / 7.0)
-    step = st.session_state.current_step
-
-    steps_data = {
-        1: {
-            "title": "1. Partenza intelligente",
-            "code": "1. Popolazione = 20% Nearest Neighbor + 80% random",
-            "desc": "Una parte della popolazione iniziale non è casuale: si costruisce visitando ogni volta il cliente più vicino non ancora servito. Si parte già da un costo basso invece che da un groviglio di rotte."
-        },
-        2: {
-            "title": "2. Valutazione",
-            "code": "2. Ordina la popolazione per costo (affinità = 1 / costo)",
-            "desc": "Ogni soluzione viene valutata e ordinata: le più economiche sono anche le più 'affini' al problema, e passano alla fase successiva con priorità."
-        },
-        3: {
-            "title": "3. Selezione ed espansione clonale",
-            "code": "3. Clona le soluzioni migliori, proporzionalmente al rango",
-            "desc": "Le soluzioni migliori generano più cloni delle altre. È la fase di sfruttamento (exploitation): si concentra la ricerca vicino a ciò che già funziona."
-        },
-        4: {
-            "title": "4. Ruin & Recreate (LNS)",
-            "code": "4. Muta i cloni, incluso Ruin & Recreate",
-            "desc": "Un tratto di rotta viene smontato ('ruin') e i nodi rimossi vengono ricollocati dove convengono davvero, anche su un altro veicolo ('recreate'). È una mutazione più drastica di un semplice scambio."
-        },
-        5: {
-            "title": "5. Ricerca locale con Simulated Annealing",
-            "code": "5. 2-Opt con accettazione simulated annealing sui cloni migliori",
-            "desc": "La 2-Opt districa gli incroci nelle rotte. Grazie al Simulated Annealing, l'algoritmo accetta anche mosse temporaneamente peggiori, con probabilità che si riduce nel tempo — così evita di restare intrappolato in un minimo locale."
-        },
-        6: {
-            "title": "6. Receptor editing",
-            "code": "6. Sostituisci le soluzioni peggiori con nuove soluzioni random",
-            "desc": "Per non perdere diversità, le soluzioni peggiori vengono buttate e rimpiazzate con soluzioni completamente nuove. È la fase di esplorazione (exploration)."
-        },
-        7: {
-            "title": "7. Nuova generazione",
-            "code": "7. Torna al punto 2",
-            "desc": "Il ciclo ricomincia dalla valutazione, generazione dopo generazione, finché il budget di valutazioni non è esaurito."
-        }
-    }
-
-    col_code, col_vis = st.columns([1, 1.5])
-
-    with col_code:
-        st.subheader("Pseudocodice")
-        pseudocode = ""
-        for i in range(1, 8):
-            mark = "👉" if i == step else "  "
-            color = ACCENT if i == step else INACTIVE_TEXT
-            weight = "bold" if i == step else "normal"
-            pseudocode += f"<div style='color:{color}; font-weight:{weight}; padding:4px; font-family:monospace'>{mark} {steps_data[i]['code']}</div>"
-        st.markdown(f"<div style='background-color:{HOVER_BG}; padding:15px; border-radius:10px;'>{pseudocode}</div>", unsafe_allow_html=True)
-
-        st.markdown(f"### {steps_data[step]['title']}")
-        st.info(steps_data[step]['desc'])
-
-    with col_vis:
-        st.subheader("Visualizzazione")
-        fig_edu = go.Figure()
-        fig_edu.update_xaxes(visible=False, range=[0, 1])
-        fig_edu.update_yaxes(visible=False, range=[0, 1])
-
-        if step == 1:
-            nx_, ny_ = [0.1, 0.4, 0.3], [0.1, 0.3, 0.6]
-            fig_edu.add_trace(go.Scatter(x=nx_, y=ny_, mode="lines+markers",
-                                          line=dict(color=ACCENT, width=2), marker=dict(size=12, color=ACCENT)))
-            fig_edu.add_trace(go.Scatter(x=[0.1], y=[0.1], mode="markers", marker=dict(symbol="square", size=16, color=DEPOT_COLOR)))
-            fig_edu = style_fig(fig_edu, "Costruzione greedy: salta al nodo più vicino", height=320)
-
-        elif step == 2:
-            fitness = [10, 8, 5, 2, 1]
-            # Gradiente dal teal (rango 1, più affine) al grigio (rango 5, meno affine):
-            # il colore da solo comunica l'ordinamento, non solo l'altezza della barra.
-            fig_edu.add_trace(go.Bar(x=[f"Sol {i+1}" for i in range(5)], y=fitness,
-                                      marker_color=RANK_GRADIENT,
-                                      text=[f"rango {i+1}" for i in range(5)], textposition="outside"))
-            fig_edu.update_xaxes(visible=True)
-            fig_edu.update_yaxes(visible=True, title_text="Affinità (1 / costo)")
-            fig_edu = style_fig(fig_edu, "Ordinamento per affinità (costo minore = migliore)", height=320)
-
-        elif step == 3:
-            fig_edu.add_trace(go.Scatter(x=[0.3, 0.5, 0.7], y=[0.7, 0.7, 0.7], mode="markers+text",
-                                          marker=dict(size=18, color=ACCENT), text=["", "", ""]))
-            fig_edu.add_trace(go.Scatter(x=[0.4, 0.6], y=[0.4, 0.4], mode="markers",
-                                          marker=dict(size=14, color=ROUTE_PALETTE[1])))
-            fig_edu.add_trace(go.Scatter(x=[0.5], y=[0.1], mode="markers",
-                                          marker=dict(size=10, color=ROUTE_PALETTE[2])))
-            fig_edu.add_annotation(x=0.1, y=0.8, text="Migliore → 3 cloni", showarrow=False, font=dict(color=ACCENT), xanchor="left")
-            fig_edu.add_annotation(x=0.1, y=0.5, text="Seconda → 2 cloni", showarrow=False, font=dict(color=ROUTE_PALETTE[1]), xanchor="left")
-            fig_edu.add_annotation(x=0.1, y=0.2, text="Terza → 1 clone", showarrow=False, font=dict(color=ROUTE_PALETTE[2]), xanchor="left")
-            fig_edu = style_fig(fig_edu, "Espansione clonale", height=320)
-
-        elif step == 4:
-            # Rotta residua (i nodi non toccati dal ruin restano collegati)
-            fig_edu.add_trace(go.Scatter(x=[0.1, 0.9], y=[0.5, 0.5],
-                                          mode="lines+markers", name="Rotta residua",
-                                          line=dict(color=WHITE, width=1.5, dash="dot"),
-                                          marker=dict(size=10, color=WHITE)))
-            # Ruin: il segmento centrale viene tolto dalla rotta
-            fig_edu.add_trace(go.Scatter(x=[0.3, 0.5, 0.7], y=[0.6, 0.75, 0.6], mode="markers+lines",
-                                          name="Ruin (rimossi)", marker=dict(size=12, color=DEPOT_COLOR),
-                                          line=dict(color=DEPOT_COLOR, dash="dash")))
-            # Recreate: gli stessi nodi vengono reinseriti nel punto di costo minimo
-            # della rotta residua (anche su un altro veicolo) — qui collegati, non isolati.
-            fig_edu.add_trace(go.Scatter(x=[0.1, 0.35, 0.9], y=[0.5, 0.25, 0.5], mode="markers+lines",
-                                          name="Recreate (reinseriti)", marker=dict(size=12, color=SUCCESS_COLOR),
-                                          line=dict(color=SUCCESS_COLOR, width=2)))
-            fig_edu.add_annotation(x=0.5, y=0.75, text="rimossi", showarrow=False, font=dict(color=DEPOT_COLOR, size=11))
-            fig_edu.add_annotation(x=0.35, y=0.2, text="reinseriti nel punto migliore", showarrow=False,
-                                    font=dict(color=SUCCESS_COLOR, size=11))
-            fig_edu = style_fig(fig_edu, "Large Neighborhood Search: Ruin & Recreate", height=320)
-
-        elif step == 5:
-            # Pannello sinistro: la 2-Opt classica, un incrocio che diventa migliorativo
-            fig_edu.add_trace(go.Scatter(x=[0.02, 0.2], y=[0.75, 0.95], mode="lines",
-                                          line=dict(color=DEPOT_COLOR, width=2, dash="dash"), name="Incrocio (Δ<0, migliora)"))
-            fig_edu.add_trace(go.Scatter(x=[0.02, 0.2], y=[0.95, 0.75], mode="lines",
-                                          line=dict(color=DEPOT_COLOR, width=2, dash="dash"), showlegend=False))
-            fig_edu.add_trace(go.Scatter(x=[0.32, 0.5], y=[0.75, 0.75], mode="lines",
-                                          line=dict(color=SUCCESS_COLOR, width=3), name="Accettata sempre"))
-            fig_edu.add_trace(go.Scatter(x=[0.32, 0.5], y=[0.95, 0.95], mode="lines",
-                                          line=dict(color=SUCCESS_COLOR, width=3), showlegend=False))
-            fig_edu.add_annotation(x=0.11, y=1.03, text="prima", showarrow=False, font=dict(size=10, color=WHITE))
-            fig_edu.add_annotation(x=0.41, y=1.03, text="dopo", showarrow=False, font=dict(size=10, color=WHITE))
-
-            # Pannello destro: il caso specifico del Simulated Annealing — mossa che
-            # PEGGIORA il costo ma viene accettata comunque con probabilità P = e^(-Δ/T)
-            fig_edu.add_trace(go.Scatter(x=[0.65, 0.95], y=[0.75, 0.95], mode="lines",
-                                          line=dict(color=YELLOW_WARNING, width=3, dash="dot"),
-                                          name="Mossa peggiorativa (Δ>0)"))
-            fig_edu.add_annotation(x=0.8, y=1.05, text="accettata con P = e^(−Δ/T)", showarrow=False,
-                                    font=dict(size=11, color=YELLOW_WARNING))
-            fig_edu.add_annotation(x=0.8, y=0.55, text="↳ evita di restare bloccati<br>in un minimo locale",
-                                    showarrow=False, font=dict(size=10, color=INACTIVE_TEXT))
-
-            fig_edu.update_yaxes(range=[0.4, 1.15])
-            fig_edu = style_fig(fig_edu, "2-Opt: correzione standard vs accettazione Simulated Annealing", height=320)
-
-        elif step == 6:
-            fig_edu.add_trace(go.Scatter(x=[0.2, 0.3, 0.25], y=[0.8, 0.8, 0.7], mode="markers",
-                                          name="Elite sopravvissuti", marker=dict(size=14, color=ACCENT)))
-            fig_edu.add_trace(go.Scatter(x=[0.7, 0.8, 0.6, 0.9], y=[0.2, 0.3, 0.1, 0.4], mode="markers",
-                                          name="Nuovi (random)", marker=dict(size=14, color=WARNING_COLOR, symbol="star")))
-            fig_edu = style_fig(fig_edu, "Receptor editing: iniezione di diversità", height=320)
-
-        elif step == 7:
-            fig_edu.add_annotation(x=0.5, y=0.5, text="RIPETI<br>IL CICLO", showarrow=False,
-                                    font=dict(size=22, color=ACCENT))
-            # Due frecce curve che formano un anello, per comunicare visivamente il loop
-            fig_edu.add_annotation(x=0.78, y=0.22, ax=0.22, ay=0.78, xref="x", yref="y", axref="x", ayref="y",
-                                    showarrow=True, arrowhead=3, arrowsize=1.2, arrowwidth=2.5, arrowcolor=ACCENT,
-                                    text="")
-            fig_edu.add_annotation(x=0.22, y=0.78, ax=0.78, ay=0.22, xref="x", yref="y", axref="x", ayref="y",
-                                    showarrow=True, arrowhead=3, arrowsize=1.2, arrowwidth=2.5, arrowcolor=ACCENT,
-                                    text="")
-            fig_edu.add_annotation(x=0.5, y=0.85, text="torna allo step 2 (Valutazione)", showarrow=False,
-                                    font=dict(size=11, color=INACTIVE_TEXT))
-            fig_edu = style_fig(fig_edu, "Si torna alla fase di valutazione", height=320)
-
-        st.plotly_chart(fig_edu, use_container_width=True)
+# --- FOOTER ---
+st.divider()
+st.markdown(
+    """
+    <div style='text-align: center; color: #666;'>
+        <p>Progetto per il corso di <strong>Heuristics & Metaheuristics for Optimization & Learning</strong></p>
+        <p>🔗 <a href='https://github.com/MaccarroneAlessia/Capacitated-Vehicle-Routing-Problem' target='_blank' style='text-decoration: none; color: #0984e3; font-weight: bold;'>Visualizza il Codice Sorgente su GitHub</a></p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)

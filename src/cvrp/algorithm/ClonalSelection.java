@@ -35,13 +35,17 @@ public class ClonalSelection {
     private int currentEvaluations;
     private Antibody bestAntibody;
     private int bestEvaluations;
+    private int totalIterations;
+    private int bestIteration;
     
     // Algorithmic estimation for total necessary vehicles
     private int estimatedK = -1;
 
     // ABLATION FLAGS (for experimental toggle of algorithmic features)
+    // Default: NN_LNS — eletta configurazione migliore dallo studio d'ablazione su 85 istanze
+    // NN_LNS raggiunge il 92.99% del costo baseline con solo il 174% del tempo (vs ALL al 1193%)
     private boolean useNN = true;
-    private boolean useSA = true;
+    private boolean useSA = false;
     private boolean useLNS = true;
     private boolean useAdaptiveMode = true;
 
@@ -57,6 +61,14 @@ public class ClonalSelection {
 
     public int getBestEvaluations() {
         return bestEvaluations;
+    }
+
+    public int getTotalIterations() {
+        return totalIterations;
+    }
+
+    public int getBestIteration() {
+        return bestIteration;
     }
 
     // Callbacks for tracking algorithm convergence and telemetry
@@ -85,6 +97,8 @@ public class ClonalSelection {
      */
     public Antibody run() {
         currentEvaluations = 0;
+        totalIterations = 0;
+        bestIteration = 0;
         
         // Fallback se l'inizializzazione Greedy (NN) è disattivata dall'ablation
         // Fallback constraint logic to establish minimum fleet size if Greedy heuristic is bypassed
@@ -107,6 +121,7 @@ public class ClonalSelection {
         
         // Main Evolutionary Loop bounded by Fitness Evaluation budget
         while (currentEvaluations < maxEvaluations) {
+            totalIterations++;
             // Sort population by fitness (lower cost is prioritized)
             Collections.sort(population);
 
@@ -114,6 +129,7 @@ public class ClonalSelection {
             if (bestAntibody == null || population.get(0).getFitness() < bestAntibody.getFitness()) {
                 bestAntibody = new Antibody(population.get(0));
                 bestEvaluations = currentEvaluations;
+                bestIteration = totalIterations;
                 if (tracker != null) {
                     tracker.onNewBest(currentEvaluations, bestAntibody.getFitness(), bestAntibody);
                 }

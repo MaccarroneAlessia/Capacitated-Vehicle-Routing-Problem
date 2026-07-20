@@ -1,6 +1,7 @@
 Instance: A-n48-k7
-Best Cost: 1139.2116816824137
-Mean Cost: 1176.8788617607568
-StdDev Cost: 41.477846930861695
-Mean Iterations (Evaluations): 161153.2
+Best Cost: 1105.6570951775493
+Mean Cost: 1148.414943290833
+StdDev Cost: 37.533039469821944
+Mean FE (Evaluations): 85477.6
+Mean Generations (While Iterations): 432.2
 Satisfability: 47/47

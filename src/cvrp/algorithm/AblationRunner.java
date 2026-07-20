@@ -6,110 +6,185 @@ import cvrp.model.Instance;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.stream.Stream;
 
-/**
- * Orchestratore sperimentale per lo studio di ablazione (Ablation Study).
- * Questo script isola, disattiva e riattiva selettivamente le varie componenti algoritmiche
- * (Greedy Initialization, Simulated Annealing, Large Neighborhood Search)
- * per valutare scientificamente l'impatto matematico e prestazionale di ogni singola
- * componente sulla fitness finale della meta-euristica.
- */
 public class AblationRunner {
 
     public static void main(String[] args) {
         String dataDir = "data";
         String resultsDir = "results/ablations";
         
-        // Define target instances of varying sizes and complexities for a rigorous benchmark
-        String[] targetInstances = {"A-n32-k5", "A-n45-k6", "B-n56-k7", "E-n101-k14"};
+        // Istanze di cui esportiamo anche l'andamento completo per i grafici nel Notebook
+        // Più piccola	P-n16-k8
+        // Più grande	E-n101-k14
+        // Meno satura	E-n23-k3	
+        // Più satura	B-n57-k7
+        // "A-n32-k5"
+        // "A-n45-k6"
+        // "B-n56-k7"
+        Set<String> detailInstances = new HashSet<>(Arrays.asList("P-n16-k8", "E-n101-k14", "E-n23-k3", "B-n57-k7", "A-n32-k5", "A-n45-k6", "B-n56-k7"));
 
-        for (String targetInstance : targetInstances) {
-            // Flexible path resolution supporting both flat and nested 'data' directories
-            File instanceFile = new File(dataDir, targetInstance.substring(0, 1) + "/" + targetInstance + ".vrp");
-            if (!instanceFile.exists()) {
-                instanceFile = new File(dataDir, targetInstance + ".vrp");
-            }
-            if (!instanceFile.exists()) {
-                 System.err.println("File istanza non trovato: " + targetInstance);
-                 continue;
-            }
+        List<File> instanceFilesList = new ArrayList<>();
+        try (Stream<Path> paths = Files.walk(Paths.get(dataDir))) {
+            paths.filter(Files::isRegularFile)
+                 .filter(p -> p.toString().endsWith(".vrp"))
+                 .forEach(p -> instanceFilesList.add(p.toFile()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-            System.out.println("=== ABLATION STUDY: " + targetInstance + " ===");
+        File[] instanceFiles = instanceFilesList.toArray(new File[0]);
+        if (instanceFiles.length == 0) {
+            System.err.println("Nessuna istanza trovata in data/");
+            return;
+        }
+
+        String[] configs = {"baseline", "nn", "sa", "lns", "nn_sa", "nn_lns", "sa_lns", "all"};
+        Map<String, Integer> winCounts = new HashMap<>();
+        for (String c : configs) winCounts.put(c, 0);
+
+        int totalInstancesProcessed = 0;
+
+        long globalStartTime = System.currentTimeMillis();
+        
+        Path metricsPath = Paths.get(resultsDir, "ablation_global_metrics.csv");
+        new File(resultsDir).mkdirs();
+        try (FileWriter w = new FileWriter(metricsPath.toFile())) {
+            w.write("Instance,Configuration,Cost,TimeMs,BestEval\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        for (File instanceFile : instanceFiles) {
+            String instanceName = instanceFile.getName().replace(".vrp", "");
+            System.out.println("=== ABLATION STUDY: " + instanceName + " ===");
+            long startInstanceTime = System.currentTimeMillis();
 
             Instance instance = null;
             try {
-                // Parse instance file into immutable geometric data structure
                 instance = new Instance(instanceFile.getAbsolutePath());
             } catch (Exception e) {
                 e.printStackTrace();
                 continue;
             }
 
-            // Create target output directory for this specific instance
-            String targetDir = resultsDir + "/" + targetInstance;
-            new java.io.File(targetDir).mkdirs();
+            boolean isDetail = detailInstances.contains(instanceName);
+            String targetDir = resultsDir + "/" + instanceName;
+            if (isDetail) {
+                new java.io.File(targetDir).mkdirs();
+            }
 
-            // Hyperparameter baseline configuration
             int popSize = 100;
             int selectionSize = 20;
             double cloneFactor = 0.5;
             int maxEvaluations = 350000;
-            long seed = 42; // Fixed seed for reproducible stochastic benchmarking
+            long seed = 42;
 
-            // Execute the full cartesian product of algorithmic components
-            runAblation(instance, "baseline", false, false, false, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
-            runAblation(instance, "nn", true, false, false, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
-            runAblation(instance, "sa", false, true, false, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
-            runAblation(instance, "lns", false, false, true, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
-            runAblation(instance, "nn_sa", true, true, false, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
-            runAblation(instance, "nn_lns", true, false, true, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
-            runAblation(instance, "sa_lns", false, true, true, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
-            runAblation(instance, "all", true, true, true, popSize, selectionSize, cloneFactor, maxEvaluations, seed, targetDir);
+            Map<String, Double> costs = new HashMap<>();
+
+            try (FileWriter metricsWriter = new FileWriter(metricsPath.toFile(), true)) {
+                for (String c : configs) {
+                    boolean nn = c.contains("nn") || c.equals("all");
+                    boolean sa = c.contains("sa") || c.equals("all");
+                    boolean lns = c.contains("lns") || c.equals("all");
+                    if (c.equals("baseline")) { nn = false; sa = false; lns = false; }
+                    
+                    double[] result = runAblation(instance, c, nn, sa, lns, popSize, selectionSize, cloneFactor, maxEvaluations, seed, isDetail ? targetDir : null);
+                    costs.put(c, result[0]);
+                    
+                    metricsWriter.write(instanceName + "," + c + "," + result[0] + "," + (long)result[1] + "," + (int)result[2] + "\n");
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            // Trova il vincitore
+            double minCost = Double.MAX_VALUE;
+            String winner = "";
+            for (Map.Entry<String, Double> entry : costs.entrySet()) {
+                if (entry.getValue() < minCost) {
+                    minCost = entry.getValue();
+                    winner = entry.getKey();
+                }
+            }
+            
+            winCounts.put(winner, winCounts.get(winner) + 1);
+            totalInstancesProcessed++;
+            long endInstanceTime = System.currentTimeMillis();
+            System.out.println("  -> WINNER per " + instanceName + ": " + winner.toUpperCase() + " (Time: " + (endInstanceTime - startInstanceTime) + " ms)\n");
         }
-        System.out.println("Ablation study completato per tutte le istanze.");
+
+        long globalEndTime = System.currentTimeMillis();
+        System.out.println("=====================================================");
+        System.out.println("  RISULTATI FINALI ABLATION SU " + totalInstancesProcessed + " ISTANZE (Total time: " + (globalEndTime - globalStartTime) + " ms)");
+        System.out.println("=====================================================");
+        
+        String bestConfig = "";
+        int maxWins = -1;
+
+        for (String c : configs) {
+            int wins = winCounts.get(c);
+            double pct = (wins / (double) totalInstancesProcessed) * 100.0;
+            System.out.printf(" - Configurazione %-8s: %3d vittorie (%.1f%%)\n", c.toUpperCase(), wins, pct);
+            
+            if (wins > maxWins) {
+                maxWins = wins;
+                bestConfig = c;
+            }
+        }
+        
+        System.out.println("\n🏆 Configurazione statisticamente migliore: " + bestConfig.toUpperCase() + " con il " + String.format("%.1f", (maxWins / (double) totalInstancesProcessed) * 100.0) + "% di dominanza.");
     }
 
-    /**
-     * Innesca un'esecuzione isolata dell'algoritmo genetico disabilitando/abilitando componenti selettive.
-     * Utilizza un'interfaccia funzionale (lambda) per intercettare il tracker
-     * ed esportare dinamicamente i dati di convergenza (Evaluations vs Cost) in formato CSV.
-     */
-    private static void runAblation(Instance instance, String name, boolean useNN, boolean useSA, boolean useLNS,
+    private static double[] runAblation(Instance instance, String name, boolean useNN, boolean useSA, boolean useLNS,
                                     int popSize, int selectionSize, double cloneFactor, int maxEvaluations, long seed, String targetDir) {
-        System.out.println("Running config: " + name + " (NN=" + useNN + ", SA=" + useSA + ", LNS=" + useLNS + ")");
+        System.out.println("Running config: " + name);
         
-        // Initialize the algorithmic engine with defined hyper-parameters
         ClonalSelection clonalg = new ClonalSelection(instance, popSize, selectionSize, cloneFactor, maxEvaluations, seed);
-        
-        // Force structural ablations according to the study matrix
         clonalg.setAblations(useNN, useSA, useLNS);
-        clonalg.setAdaptiveMode(false); // Disabilita la Saturated Mode per un test di ablazione "puro"
+        clonalg.setAdaptiveMode(false);
 
-        // Platform-agnostic path resolution for output CSVs
-        java.nio.file.Path csvPath = java.nio.file.Paths.get(targetDir, instance.name + "_ablation_" + name + "_convergence.csv");
-        
-        try (FileWriter csvWriter = new FileWriter(csvPath.toFile())) {
-            // Write standard CSV header
-            csvWriter.write("Evaluations,BestCost\n");
-            
-            // Attach lambda callback to track fitness convergence asynchronously
+        FileWriter csvWriter = null;
+        if (targetDir != null) {
+            java.nio.file.Path csvPath = java.nio.file.Paths.get(targetDir, instance.name + "_ablation_" + name + "_convergence.csv");
+            try {
+                csvWriter = new FileWriter(csvPath.toFile());
+                csvWriter.write("Evaluations,BestCost\n");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        final FileWriter finalCsvWriter = csvWriter;
+
+        if (finalCsvWriter != null) {
             clonalg.setTracker((evaluations, cost, bestAb) -> {
                 try {
-                    csvWriter.write(evaluations + "," + cost + "\n");
-                    // Avoid calling flush at each iteration to prevent massive I/O bottlenecks
+                    finalCsvWriter.write(evaluations + "," + cost + "\n");
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             });
-
-            // Trigger the execution
-            Antibody best = clonalg.run();
-            
-            // Force write persistence after completion
-            csvWriter.flush(); // Garantisce la persistenza dei dati prima della chiusura
-            System.out.println("  -> Best Cost: " + best.getFitness());
-        } catch (IOException e) {
-            e.printStackTrace();
         }
+
+        long startRunTime = System.currentTimeMillis();
+        Antibody best = clonalg.run();
+        long endRunTime = System.currentTimeMillis();
+        System.out.println("    -> Cost: " + best.getFitness() + " (Time: " + (endRunTime - startRunTime) + " ms)");
+        
+        if (finalCsvWriter != null) {
+            try {
+                finalCsvWriter.flush();
+                finalCsvWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        
+        return new double[] { best.getFitness(), (endRunTime - startRunTime), clonalg.getBestEvaluations() };
     }
 }

@@ -1,5 +1,6 @@
 streamlit
 pandas
 matplotlib
-numpy
+numpy==1.26.2
 plotly
+scipy

@@ -1,6 +1,7 @@
 Instance: E-n76-k14
-Best Cost: 1139.4697076094262
-Mean Cost: 1166.9359317029569
-StdDev Cost: 20.538517653853173
-Mean Iterations (Evaluations): 176284.4
+Best Cost: 1128.9008700774787
+Mean Cost: 1179.7772423757992
+StdDev Cost: 54.322943407695405
+Mean FE (Evaluations): 132935.2
+Mean Generations (While Iterations): 658.6
 Satisfability: 75/75

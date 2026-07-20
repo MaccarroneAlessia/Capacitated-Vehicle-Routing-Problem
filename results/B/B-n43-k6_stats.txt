@@ -1,6 +1,7 @@
 Instance: B-n43-k6
-Best Cost: 747.5706787134661
-Mean Cost: 761.1268036979383
-StdDev Cost: 10.687399128867815
-Mean Iterations (Evaluations): 102647.2
+Best Cost: 755.2462984917727
+Mean Cost: 768.84811666916
+StdDev Cost: 12.522599988844306
+Mean FE (Evaluations): 94611.2
+Mean Generations (While Iterations): 483.2
 Satisfability: 42/42

@@ -1,6 +1,7 @@
 Instance: E-n22-k4
-Best Cost: 375.2797871480124
-Mean Cost: 385.72887681466386
-StdDev Cost: 12.97993131100149
-Mean Iterations (Evaluations): 132961.0
+Best Cost: 375.2797871480125
+Mean Cost: 384.83982516941313
+StdDev Cost: 6.866865229967921
+Mean FE (Evaluations): 148639.0
+Mean Generations (While Iterations): 740.0
 Satisfability: 21/21

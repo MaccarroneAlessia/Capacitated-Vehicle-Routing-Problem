@@ -1,6 +1,7 @@
 Instance: A-n61-k9
-Best Cost: 1166.2197277024907
-Mean Cost: 1196.947369822562
-StdDev Cost: 28.562449070433818
-Mean Iterations (Evaluations): 129541.6
+Best Cost: 1140.2603149581091
+Mean Cost: 1167.4214068799158
+StdDev Cost: 16.79917658396207
+Mean FE (Evaluations): 171194.0
+Mean Generations (While Iterations): 848.0
 Satisfability: 60/60

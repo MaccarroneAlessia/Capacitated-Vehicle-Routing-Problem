@@ -1,6 +1,7 @@
 Instance: P-n40-k5
 Best Cost: 461.72617176318863
-Mean Cost: 466.0339367877991
-StdDev Cost: 6.3014249143563905
-Mean Iterations (Evaluations): 23740.0
+Mean Cost: 475.56198314805505
+StdDev Cost: 21.689159568411835
+Mean FE (Evaluations): 58924.2
+Mean Generations (While Iterations): 299.6
 Satisfability: 39/39

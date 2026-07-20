@@ -13,16 +13,17 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     # ==========================
     # TEST JAVA
     # ==========================
     - name: Setup Java JDK 17
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
+        cache: 'maven'
         
     - name: Build Java Code
       run: |
@@ -30,14 +31,19 @@ jobs:
         javac -d bin -sourcepath src src/cvrp/algorithm/Main.java
         echo "✅ Compilazione Java completata con successo"
 
+    - name: Run Java Dry-Run (Test Esecuzione)
+      run: |
+        java -cp bin cvrp.algorithm.Main --live A-n32-k5
+        echo "✅ Test di esecuzione Java (dry-run su A-n32-k5) completato senza errori di runtime"
+
     # ==========================
     # TEST PYTHON
     # ==========================
     - name: Setup Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-        cache: 'pip' # Aggiunge caching per installazioni più veloci
+        cache: 'pip'
 
     - name: Install Python dependencies
       run: |
@@ -47,6 +53,5 @@ jobs:
     - name: Check Python Syntax (Flake8)
       run: |
         pip install flake8
-        # Interrompe la build se ci sono errori di sintassi o variabili non definite
         flake8 src/demo/app.py --count --select=E9,F63,F7,F82 --show-source --statistics
         echo "✅ Analisi sintattica Python completata"

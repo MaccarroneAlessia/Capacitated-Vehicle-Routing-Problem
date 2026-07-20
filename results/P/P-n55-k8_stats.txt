@@ -1,6 +1,7 @@
 Instance: P-n55-k8
-Best Cost: 615.5153848533888
-Mean Cost: 633.9793666607687
-StdDev Cost: 15.744978240929951
-Mean Iterations (Evaluations): 77783.2
+Best Cost: 597.0851878110419
+Mean Cost: 617.3922383677302
+StdDev Cost: 20.695766012237165
+Mean FE (Evaluations): 105085.6
+Mean Generations (While Iterations): 547.8
 Satisfability: 54/54

@@ -1,6 +1,7 @@
 Instance: E-n30-k3
 Best Cost: 538.7946864904361
-Mean Cost: 540.1858000160447
-StdDev Cost: 3.110624407680179
-Mean Iterations (Evaluations): 153985.6
+Mean Cost: 541.5769135416533
+StdDev Cost: 3.8097212901317987
+Mean FE (Evaluations): 120378.4
+Mean Generations (While Iterations): 599.4
 Satisfability: 29/29

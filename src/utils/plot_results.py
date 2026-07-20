@@ -55,8 +55,8 @@ def plot_solution(instance_name):
         if not route: continue
         
         # Extract x and y coordinates
-        xs = [depot[0]] + [node[0] for node in route] + [depot[0]]
-        ys = [depot[1]] + [node[1] for node in route] + [depot[1]]
+        xs = [depot[0]] + [(node["x"] if isinstance(node, dict) else node[0]) for node in route] + [depot[0]]
+        ys = [depot[1]] + [(node["y"] if isinstance(node, dict) else node[1]) for node in route] + [depot[1]]
         
         color = cmap(i % 20)
         

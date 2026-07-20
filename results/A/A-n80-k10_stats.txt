@@ -1,6 +1,7 @@
 Instance: A-n80-k10
-Best Cost: 1903.1735808488588
-Mean Cost: 1959.2796426838017
-StdDev Cost: 66.93223320267394
-Mean Iterations (Evaluations): 132157.0
+Best Cost: 1891.0889209189595
+Mean Cost: 1947.3992716564856
+StdDev Cost: 54.064486506179115
+Mean FE (Evaluations): 88861.6
+Mean Generations (While Iterations): 442.6
 Satisfability: 79/79

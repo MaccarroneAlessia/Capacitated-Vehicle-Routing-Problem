@@ -1,6 +1,7 @@
 Instance: P-n23-k8
 Best Cost: 531.1738035458811
-Mean Cost: 539.2178794043274
-StdDev Cost: 12.899049733406311
-Mean Iterations (Evaluations): 20259.6
+Mean Cost: 539.1805865787834
+StdDev Cost: 9.83667837269541
+Mean FE (Evaluations): 10563.6
+Mean Generations (While Iterations): 52.8
 Satisfability: 22/22
