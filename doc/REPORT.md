@@ -55,13 +55,37 @@ Output: Miglior soluzione (Best_Antibody)
 **Flowchart Architetturale**
 ```mermaid
 graph TD
-    A["Inizializzazione Popolazione<br/>20% Nearest Neighbor, 80% Random"] --> B["Valutazione Affinità<br/>1 / Costo"]
-    B --> C{"Stop Criterion Raggiunto?<br/>Max Evals = 350.000"}
-    C -- Sì --> D["Restituisci Best Antibody"]
-    C -- No --> E["Selezione & Clonazione<br/>Proporzionale al rango"]
-    E --> F["Iper-Mutazione<br/>Swap, LNS Ruin & Recreate"]
-    F --> H["Receptor Editing<br/>Sostituzione peggiori con soluzioni fresche"]
-    H --> B
+    A["Inizializzazione<br>(NN 20% + Random 80%)"] --> B["Calcolo Affinità<br>e Ordinamento"]
+    B --> C["Clonazione<br>Proporzionale al Rango"]
+    
+    C --> D{"Saturazione<br>> 80%?"}
+    
+    D -- "sì" --> E["Calcolo parametro Fuzzy α"]
+    D -- "no" --> F["α = 0"]
+    
+    E --> G
+    F --> G
+    
+    G["Iper-Mutazione<br>Pesi degli operatori influenzati da α"] --> H["Inserimento Migliori Cloni"]
+    
+    H --> I["Receptor Editing<br>Tasso di rimpiazzo influenzato da α"]
+    
+    I --> J{"FE < FE_max?"}
+    J -- "sì" --> B
+    J -- "no" --> K["Restituisci<br>Miglior Anticorpo"]
+
+    %% Colori
+    style A fill:#e6efff,stroke:#6b7280
+    style B fill:#e6efff,stroke:#6b7280
+    style C fill:#e6efff,stroke:#6b7280
+    style D fill:#ffedd5,stroke:#fdba74
+    style E fill:#fef3c7,stroke:#fcd34d
+    style F fill:#fef3c7,stroke:#fcd34d
+    style G fill:#e6efff,stroke:#6b7280
+    style H fill:#e6efff,stroke:#6b7280
+    style I fill:#e6efff,stroke:#6b7280
+    style J fill:#ffedd5,stroke:#fdba74
+    style K fill:#dcfce7,stroke:#86efac
 ```
 
 ---
@@ -147,6 +171,9 @@ Per contrastare l'ingabbiamento geometrico delle istanze quasi sature (es. A-n45
 
 $$\alpha = \max\left(0.0, \min\left(1.0, \frac{\text{Saturazione} - 0.80}{0.95 - 0.80}\right)\right)$$
 
+![Funzione fuzzy: modulazione stocastica](../results/infographics/fuzzy_logic.png)
+*Figura: Andamento della funzione di membership fuzzy. La fascia di transizione (80%-95%) modula dolcemente il parametro $\alpha$ da 0 a 1. Come evidenziato dalla linea tratteggiata, le istanze critiche come A-n45-k6 operano a regime completamente saturo ($\alpha = 1$).*
+
 Questo parametro viene usato per interpolare linearmente le probabilità degli operatori inter-rotta, adattando dinamicamente il focus dell'algoritmo dall'esplorazione distruttiva alla preservazione della fattibilità.
 
 **Guardia Transazionale Deterministica $O(1)$:**
@@ -188,6 +215,13 @@ L'algoritmo è stato testato sulle **10 istanze di protocollo** richieste dalla 
 
 ### 4.1 Analisi Statistica Globale (Dataset Completo)
 A valle dell'esecuzione massiva su tutte le 85 istanze dei set raccomandati (A, B, E, P), è emerso un quadro statistico particolarmente solido:
+
+| Famiglia | Gap medio (%) | CV medio (%) | Iterazioni medie | Satisfability |
+|:---|---:|---:|---:|:---:|
+| A | ~ 3.1 | ~ 2.3 | ~ 130 000 | 100% |
+| B | ~ 2.3 | ~ 1.7 | ~ 125 000 | 100% |
+| E | ~ 3.2 | ~ 2.4 | ~ 116 000 | 100% |
+| P | ~ 2.6 | ~ 2.1 | ~ 100 000 | 100% |
 
 - **Vincolo di Capacità (Hard Constraint):** Pienamente rispettato ovunque. Tutte le istanze hanno registrato un *Satisfability Rate* del 100%.
 - **Qualità Media della Soluzione:** Il divario (gap) tra il costo medio sui 5 run e il miglior costo assoluto trovato (BestCost) si attesta in media al **2.8%**, con il 50% delle istanze al di sotto del 2.5%.
